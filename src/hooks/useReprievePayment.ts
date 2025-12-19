@@ -21,6 +21,11 @@ export interface UseReprievePaymentReturn {
   price: number;
   currency: string;
   chainName: string;
+  networkInfo: {
+    isTestnet: boolean;
+    expectedChainId: number;
+    networkName: string;
+  };
 }
 
 // Get treasury address from environment
@@ -107,11 +112,23 @@ export function useReprievePayment(): UseReprievePaymentReturn {
       const { pay, getPaymentStatus } = baseAccount;
       
       const testnet = isTestnet();
+      const expectedChainId = testnet ? 84532 : 8453; // Base Sepolia: 84532, Base Mainnet: 8453
+      
+      // Note: Base Pay in mini apps automatically handles network switching
+      // The SDK will prompt users to switch to Base network if needed
+      // We log the expected network for debugging purposes
+      console.log('[Reprieve] Expected network:', {
+        chainId: expectedChainId,
+        network: testnet ? 'Base Sepolia' : 'Base Mainnet',
+        note: 'Base Pay will automatically handle network switching if needed',
+      });
       
       console.log('[Reprieve] Initiating Base Pay payment:', {
         amount: REPRIEVE_PRICE_USDC.toFixed(2),
         to: treasuryAddress,
         testnet,
+        expectedChainId,
+        network: testnet ? 'Base Sepolia' : 'Base Mainnet',
       });
       
       // Trigger the Base Pay popup
@@ -236,7 +253,9 @@ export function useReprievePayment(): UseReprievePaymentReturn {
         } else if (msg.includes('insufficient') || msg.includes('balance')) {
           errorMessage = 'Insufficient USDC balance';
         } else if (msg.includes('network') || msg.includes('connection')) {
-          errorMessage = 'Network error - please try again';
+          errorMessage = 'Network error - please ensure you are on Base network';
+        } else if (msg.includes('chain') || msg.includes('chainid') || msg.includes('wrong network')) {
+          errorMessage = 'Please switch to Base network to complete payment';
         } else if (msg.includes('timeout')) {
           errorMessage = 'Payment timed out - please try again';
         } else {
@@ -251,6 +270,10 @@ export function useReprievePayment(): UseReprievePaymentReturn {
     }
   }, []);
   
+  const testnet = isTestnet();
+  const expectedChainId = testnet ? 84532 : 8453;
+  const networkName = testnet ? 'Base Sepolia' : 'Base Mainnet';
+  
   return {
     status,
     isPaying: status !== 'idle' && status !== 'success' && status !== 'error',
@@ -261,5 +284,10 @@ export function useReprievePayment(): UseReprievePaymentReturn {
     price: REPRIEVE_PRICE_USDC,
     currency: 'USDC',
     chainName: 'Base',
+    networkInfo: {
+      isTestnet: testnet,
+      expectedChainId,
+      networkName,
+    },
   };
 }
