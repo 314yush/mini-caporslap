@@ -71,6 +71,14 @@ export function useReprievePayment(): UseReprievePaymentReturn {
       return false;
     }
     
+    // Validate treasury address format
+    if (!treasuryAddress.startsWith('0x') || treasuryAddress.length !== 42) {
+      console.error('[Reprieve] Invalid treasury address format:', treasuryAddress);
+      setError('Invalid payment configuration');
+      setStatus('error');
+      return false;
+    }
+    
     setStatus('confirming');
     setError(null);
     setTxHash(null);
@@ -100,12 +108,38 @@ export function useReprievePayment(): UseReprievePaymentReturn {
       
       const testnet = isTestnet();
       
-      // Trigger the Base Pay popup
-      const payment = await pay({
-        amount: REPRIEVE_PRICE_USDC.toFixed(2), // e.g., "1.00"
-        to: treasuryAddress as `0x${string}`,
+      console.log('[Reprieve] Initiating Base Pay payment:', {
+        amount: REPRIEVE_PRICE_USDC.toFixed(2),
+        to: treasuryAddress,
         testnet,
       });
+      
+      // Trigger the Base Pay popup
+      let payment;
+      try {
+        payment = await pay({
+          amount: REPRIEVE_PRICE_USDC.toFixed(2), // e.g., "1.00"
+          to: treasuryAddress as `0x${string}`,
+          testnet,
+        });
+        
+        console.log('[Reprieve] Payment initiated successfully:', {
+          id: payment.id,
+          amount: payment.amount,
+          to: payment.to,
+        });
+      } catch (payError) {
+        // Log the full error for debugging
+        console.error('[Reprieve] Pay function error:', {
+          error: payError,
+          message: payError instanceof Error ? payError.message : String(payError),
+          name: payError instanceof Error ? payError.name : 'Unknown',
+          stack: payError instanceof Error ? payError.stack : undefined,
+        });
+        
+        // Re-throw with more context
+        throw payError;
+      }
       
       setTxHash(payment.id);
       setStatus('pending');
@@ -114,13 +148,26 @@ export function useReprievePayment(): UseReprievePaymentReturn {
       let attempts = 0;
       const maxAttempts = 30; // 30 seconds max
       
+      console.log('[Reprieve] Starting payment status polling:', {
+        paymentId: payment.id,
+        testnet,
+        maxAttempts,
+      });
+      
       while (attempts < maxAttempts) {
-        const { status: paymentStatus } = await getPaymentStatus({ 
-          id: payment.id,
-          testnet,
-        });
-        
-        if (paymentStatus === 'completed') {
+        try {
+          const { status: paymentStatus } = await getPaymentStatus({ 
+            id: payment.id,
+            testnet,
+          });
+          
+          console.log('[Reprieve] Payment status check:', {
+            attempt: attempts + 1,
+            status: paymentStatus,
+            paymentId: payment.id,
+          });
+          
+          if (paymentStatus === 'completed') {
           // Verify the payment on our server
           setStatus('verifying');
           
@@ -144,28 +191,57 @@ export function useReprievePayment(): UseReprievePaymentReturn {
           return true;
         }
         
-        if (paymentStatus === 'failed') {
-          throw new Error('Payment failed');
+          if (paymentStatus === 'failed') {
+            console.error('[Reprieve] Payment status is failed');
+            throw new Error('Payment failed');
+          }
+          
+          // Wait 1 second before next poll
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+        } catch (statusError) {
+          console.error('[Reprieve] Error checking payment status:', statusError);
+          // Continue polling unless it's a critical error
+          if (attempts >= maxAttempts - 1) {
+            throw statusError;
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
         }
-        
-        // Wait 1 second before next poll
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        attempts++;
       }
       
+      console.error('[Reprieve] Payment confirmation timed out after', maxAttempts, 'attempts');
       throw new Error('Payment confirmation timed out');
       
     } catch (err) {
-      console.error('[Reprieve] Payment failed:', err);
+      console.error('[Reprieve] Payment failed:', {
+        error: err,
+        message: err instanceof Error ? err.message : String(err),
+        name: err instanceof Error ? err.name : 'Unknown',
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       
       let errorMessage = 'Payment failed';
       if (err instanceof Error) {
-        if (err.message.includes('rejected') || err.message.includes('cancelled') || err.message.includes('denied')) {
+        const msg = err.message.toLowerCase();
+        
+        // More specific error detection
+        if (msg.includes('user rejected') || msg.includes('user cancelled') || msg.includes('user denied')) {
+          errorMessage = 'Payment cancelled by user';
+        } else if (msg.includes('rejected') && !msg.includes('transaction')) {
+          // "rejected" alone might mean user rejection
+          errorMessage = 'Payment was rejected';
+        } else if (msg.includes('cancelled') || msg.includes('denied')) {
           errorMessage = 'Payment cancelled';
-        } else if (err.message.includes('insufficient')) {
+        } else if (msg.includes('insufficient') || msg.includes('balance')) {
           errorMessage = 'Insufficient USDC balance';
+        } else if (msg.includes('network') || msg.includes('connection')) {
+          errorMessage = 'Network error - please try again';
+        } else if (msg.includes('timeout')) {
+          errorMessage = 'Payment timed out - please try again';
         } else {
-          errorMessage = err.message.slice(0, 60);
+          // Show the actual error message (truncated)
+          errorMessage = err.message.slice(0, 80);
         }
       }
       
