@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { MiniAppProvider } from '@/components/providers/MiniAppProvider';
 import { ConsoleLogger } from '@/components/debug';
+import { PostHogProvider } from '@/components/analytics/PostHogProvider';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -75,9 +76,11 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} font-sans antialiased bg-zinc-950 text-white`}
       >
-        <MiniAppProvider>
-          {children}
-        </MiniAppProvider>
+        <PostHogProvider>
+          <MiniAppProvider>
+            {children}
+          </MiniAppProvider>
+        </PostHogProvider>
         <ConsoleLogger enabled={true} />
         <Analytics />
         <SpeedInsights />

@@ -3,7 +3,16 @@
  * Tracks user engagement patterns, timing, and drop-off points
  */
 
-import { track } from '@vercel/analytics';
+import { trackPostHog, isPostHogReady } from './posthog';
+
+// Use PostHog if available, fallback to console (for debugging)
+const trackEngagementEvent = (event: string, properties?: Record<string, unknown>) => {
+  if (isPostHogReady()) {
+    trackPostHog(event, properties);
+  } else if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event, properties);
+  }
+};
 
 /**
  * Track time between actions (for engagement analysis)
@@ -13,7 +22,7 @@ export function trackActionTiming(
   timeSinceLastAction: number, // in milliseconds
   context?: Record<string, string | number | boolean>
 ) {
-  track('action_timing', {
+  trackEngagementEvent('action_timing', {
     action,
     timeSinceLastAction: Math.round(timeSinceLastAction),
     timeSinceLastActionSeconds: Math.round(timeSinceLastAction / 1000),
@@ -30,7 +39,7 @@ export function trackGuessTiming(
   difficulty: string,
   correct: boolean
 ) {
-  track('guess_timing', {
+  trackEngagementEvent('guess_timing', {
     timeToGuess: Math.round(timeToGuess),
     timeToGuessSeconds: Math.round(timeToGuess / 1000),
     streak,
@@ -48,7 +57,7 @@ export function trackDropOff(
   timeOnStage: number, // milliseconds
   streak?: number
 ) {
-  track('drop_off', {
+  trackEngagementEvent('drop_off', {
     stage,
     timeOnStage: Math.round(timeOnStage),
     timeOnStageSeconds: Math.round(timeOnStage / 1000),
@@ -64,7 +73,7 @@ export function trackJourneyStep(
   timeToStep: number, // milliseconds from session start
   streak?: number
 ) {
-  track('journey_step', {
+  trackEngagementEvent('journey_step', {
     step,
     timeToStep: Math.round(timeToStep),
     timeToStepSeconds: Math.round(timeToStep / 1000),
@@ -81,7 +90,7 @@ export function trackDifficultyProgression(
   streak: number,
   timeAtDifficulty: number // milliseconds
 ) {
-  track('difficulty_progression', {
+  trackEngagementEvent('difficulty_progression', {
     previousDifficulty,
     currentDifficulty,
     streak,
@@ -98,7 +107,7 @@ export function trackRetry(
   timeSinceLoss: number, // milliseconds
   timeBetweenGames: number // milliseconds
 ) {
-  track('retry', {
+  trackEngagementEvent('retry', {
     previousStreak,
     timeSinceLoss: Math.round(timeSinceLoss),
     timeSinceLossSeconds: Math.round(timeSinceLoss / 1000),
@@ -116,7 +125,7 @@ export function trackTokenInteraction(
   tokenSymbol: string,
   timeOnToken: number // milliseconds
 ) {
-  track('token_interaction', {
+  trackEngagementEvent('token_interaction', {
     interaction,
     tokenSymbol,
     timeOnToken: Math.round(timeOnToken),
@@ -131,7 +140,7 @@ export function trackLeaderboardEngagement(
   timeOnLeaderboard: number, // milliseconds
   rank?: number
 ) {
-  track('leaderboard_engagement', {
+  trackEngagementEvent('leaderboard_engagement', {
     action,
     timeOnLeaderboard: Math.round(timeOnLeaderboard),
     rank,
@@ -146,7 +155,7 @@ export function trackSocialShare(
   streak: number,
   shareContext: 'loss' | 'milestone' | 'leaderboard'
 ) {
-  track('social_share', {
+  trackEngagementEvent('social_share', {
     platform,
     streak,
     shareContext,
@@ -162,7 +171,7 @@ export function trackReprieveDecision(
   timeToDecide: number, // milliseconds from loss to decision
   paymentTime?: number // milliseconds for payment completion
 ) {
-  track('reprieve_decision', {
+  trackEngagementEvent('reprieve_decision', {
     decision,
     streak,
     timeToDecide: Math.round(timeToDecide),

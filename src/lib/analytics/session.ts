@@ -3,7 +3,16 @@
  * Tracks user sessions, timing, and engagement metrics
  */
 
-import { track } from '@vercel/analytics';
+import { trackPostHog, isPostHogReady } from './posthog';
+
+// Use PostHog if available, fallback to console (for debugging)
+const trackSessionEvent = (event: string, properties?: Record<string, unknown>) => {
+  if (isPostHogReady()) {
+    trackPostHog(event, properties);
+  } else if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event, properties);
+  }
+};
 
 export interface SessionData {
   sessionId: string;
@@ -50,7 +59,7 @@ export function startSession(userId: string): string {
   sessionStartTime = now;
   
   // Track session start
-  track('session_start', {
+  trackSessionEvent('session_start', {
     sessionId,
     userId: userId.slice(0, 8),
     timestamp: now,
@@ -75,7 +84,7 @@ export function endSession() {
   const engagementScore = calculateEngagementScore(currentSession, sessionDuration);
   
   // Track session end
-  track('session_end', {
+  trackSessionEvent('session_end', {
     sessionId: currentSession.sessionId,
     userId: currentSession.userId.slice(0, 8),
     duration: sessionDuration,

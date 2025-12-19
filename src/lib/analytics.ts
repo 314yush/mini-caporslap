@@ -1,10 +1,40 @@
 /**
- * Analytics tracking utilities for Vercel Analytics
+ * Analytics tracking utilities
+ * Supports both Vercel Analytics (Pro) and PostHog (Free)
  * Tracks game events, user actions, and key metrics
  */
 
 import { track } from '@vercel/analytics';
 import { track as trackServer } from '@vercel/analytics/server';
+import { trackPostHog, isPostHogReady } from './analytics/posthog';
+
+// Use PostHog if available, fallback to Vercel Analytics
+const trackEvent = (event: string, properties?: Record<string, unknown>) => {
+  // Try PostHog first (free tier supports custom events)
+  if (isPostHogReady()) {
+    trackPostHog(event, properties);
+  }
+  
+  // Also track with Vercel if on Pro plan (for redundancy)
+  // This will only work if you have Vercel Pro
+  // Note: Vercel Analytics free tier doesn't support custom events
+  try {
+    if (properties) {
+      // Filter properties to only include supported types
+      const vercelProperties: Record<string, string | number | boolean> = {};
+      for (const [key, value] of Object.entries(properties)) {
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          vercelProperties[key] = value;
+        }
+      }
+      track(event, vercelProperties);
+    } else {
+      track(event);
+    }
+  } catch (err) {
+    // Silently fail if Vercel Analytics doesn't support custom events (free tier)
+  }
+};
 
 /**
  * Track game start event
@@ -16,7 +46,7 @@ export function trackGameStart(
   timeSinceLastGame?: number, // milliseconds since last game
   isRetry?: boolean
 ) {
-  track('game_start', {
+  trackEvent('game_start', {
     runId,
     userId: userId.slice(0, 8), // Truncate for privacy
     timeSinceLastGame: timeSinceLastGame ? Math.round(timeSinceLastGame) : undefined,
@@ -40,7 +70,7 @@ export function trackGuess(
   difficulty?: string,
   marketCapRatio?: number // ratio between tokens
 ) {
-  track('game_guess', {
+  trackEvent('game_guess', {
     runId,
     guess,
     correct,
@@ -61,7 +91,7 @@ export function trackStreakMilestone(streak: number, runId: string) {
   // Track milestones at 5, 10, 20, 50, 100
   const milestones = [5, 10, 20, 50, 100];
   if (milestones.includes(streak)) {
-    track('streak_milestone', {
+    trackEvent('streak_milestone', {
       streak,
       runId,
       milestone: streak,
@@ -82,7 +112,7 @@ export function trackGameLoss(
   totalGuesses?: number,
   accuracy?: number // percentage
 ) {
-  track('game_loss', {
+  trackEvent('game_loss', {
     runId,
     finalStreak,
     usedReprieve,
@@ -99,7 +129,7 @@ export function trackGameLoss(
  * Track reprieve payment initiated
  */
 export function trackReprieveInitiated(runId: string, streak: number) {
-  track('reprieve_initiated', {
+  trackEvent('reprieve_initiated', {
     runId,
     streak,
   });
@@ -113,7 +143,7 @@ export function trackReprieveCompleted(
   streak: number,
   txHash: string
 ) {
-  track('reprieve_completed', {
+  trackEvent('reprieve_completed', {
     runId,
     streak,
     txHash,
@@ -128,7 +158,7 @@ export function trackReprieveFailed(
   streak: number,
   error: string
 ) {
-  track('reprieve_failed', {
+  trackEvent('reprieve_failed', {
     runId,
     streak,
     error: error.slice(0, 50), // Truncate error message
@@ -139,7 +169,7 @@ export function trackReprieveFailed(
  * Track wallet connection
  */
 export function trackWalletConnect(address: string) {
-  track('wallet_connect', {
+  trackEvent('wallet_connect', {
     address: address.slice(0, 8), // Truncate for privacy
   });
 }
@@ -148,7 +178,7 @@ export function trackWalletConnect(address: string) {
  * Track leaderboard submission
  */
 export function trackLeaderboardSubmit(streak: number, rank?: number) {
-  track('leaderboard_submit', {
+  trackEvent('leaderboard_submit', {
     streak,
     rank,
   });
