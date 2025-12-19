@@ -177,3 +177,4 @@ You can:
 2. **Create dashboards**: Save common queries for quick access
 3. **Compare periods**: See how changes affect metrics
 4. **Export data**: Download CSV for deeper analysis in Excel/Sheets
+

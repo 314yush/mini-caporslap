@@ -175,3 +175,4 @@ This will show:
 3. Verify API key in PostHog dashboard → Project Settings
 4. Try a different browser (ad blockers can interfere)
 5. Check PostHog status: https://status.posthog.com/
+

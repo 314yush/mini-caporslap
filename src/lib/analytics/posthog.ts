@@ -6,6 +6,13 @@
 
 import posthog from 'posthog-js';
 
+// Extend Window interface to include posthog
+declare global {
+  interface Window {
+    posthog?: typeof posthog;
+  }
+}
+
 let isInitialized = false;
 
 /**
@@ -33,7 +40,7 @@ export function initPostHog() {
         isInitialized = true;
         // Expose PostHog on window for debugging (optional)
         if (typeof window !== 'undefined') {
-          (window as any).posthog = ph;
+          window.posthog = ph;
         }
       },
       // Privacy settings
@@ -48,7 +55,7 @@ export function initPostHog() {
 
     // Expose the posthog instance on window
     if (typeof window !== 'undefined' && posthog) {
-      (window as any).posthog = posthog;
+      window.posthog = posthog;
     }
 
     // Set flag immediately (PostHog initializes asynchronously)
@@ -109,5 +116,6 @@ export function resetPostHog() {
 export function isPostHogReady(): boolean {
   if (typeof window === 'undefined') return false;
   // Check both our flag and PostHog's actual presence
-  return isInitialized && (!!posthog || !!(window as any).posthog);
+  return isInitialized && (!!posthog || !!window.posthog);
 }
+

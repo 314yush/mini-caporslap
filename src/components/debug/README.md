@@ -62,3 +62,4 @@ The console can be configured via props (currently defaults are used):
 - Logs are stored in memory and cleared on page refresh
 - The console doesn't interfere with normal console output - it captures logs in addition to normal console behavior
 - Maximum of 100 logs are kept (oldest logs are removed when limit is reached)
+

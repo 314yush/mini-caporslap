@@ -201,3 +201,4 @@ function getRetrySpeedCategory(timeMs: number): 'immediate' | 'quick' | 'delayed
   if (timeMs < 300000) return 'delayed'; // 5 minutes
   return 'returning';
 }
+

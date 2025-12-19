@@ -227,3 +227,4 @@ export async function sendHighScoreNotification(
 
   console.log('[Notifications] High score notification result:', result);
 }
+

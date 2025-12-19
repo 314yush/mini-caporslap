@@ -263,3 +263,4 @@ useEffect(() => {
 4. Add journey step tracking
 5. Monitor analytics dashboard
 6. Iterate based on data
+

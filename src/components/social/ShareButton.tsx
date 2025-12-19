@@ -60,3 +60,4 @@ export function ShareButton({ streak, className = '', children }: ShareButtonPro
     </button>
   );
 }
+

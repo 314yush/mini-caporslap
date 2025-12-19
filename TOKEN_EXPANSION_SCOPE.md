@@ -250,3 +250,4 @@ export async function getTokenPool(): Promise<Token[]> {
 3. **Token quality scoring**: Filter out low-quality tokens automatically
 4. **User preferences**: Allow filtering by category
 5. **Token popularity tracking**: Track which tokens appear most in games
+

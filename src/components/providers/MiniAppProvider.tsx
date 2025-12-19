@@ -147,3 +147,4 @@ export function MiniAppProvider({ children }: { children: React.ReactNode }) {
 export function useMiniApp(): MiniAppState {
   return useContext(MiniAppContext);
 }
+

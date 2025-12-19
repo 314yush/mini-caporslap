@@ -151,3 +151,4 @@ If you want to test the actual Quick Auth flow locally, you can use tunneling:
 5. **Test Quick Auth**: Now you can test the real authentication flow
 
 However, the wallet connection approach is much simpler for local development! 🚀
+
