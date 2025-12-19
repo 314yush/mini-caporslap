@@ -5,9 +5,10 @@ import {
   generateGameSeed, 
   selectInitialPairSeeded
 } from '@/lib/game-core/seeded-selection';
-import { selectInitialPair } from '@/lib/game-core/sequencing';
+import { selectInitialPair, selectNextToken } from '@/lib/game-core/sequencing';
 import { getTimerDuration } from '@/lib/game-core/timer';
 import { getRedis } from '@/lib/redis';
+import { Token } from '@/lib/game-core/types';
 
 /**
  * POST /api/game/start
@@ -60,6 +61,21 @@ export async function POST(request: NextRequest) {
     const startedAt = Date.now();
     const timerDuration = getTimerDuration(0);
 
+    // Preload a batch of tokens for smooth gameplay (5 tokens ahead)
+    const PRELOAD_COUNT = 5;
+    const preloadedTokens: Token[] = [];
+    let lastToken = nextToken;
+    const usedIds = new Set([currentToken.id, nextToken.id]);
+
+    for (let i = 0; i < PRELOAD_COUNT; i++) {
+      const nextPreloaded = selectNextToken(tokens, lastToken, Array.from(usedIds));
+      if (!nextPreloaded) break;
+      
+      preloadedTokens.push(nextPreloaded);
+      usedIds.add(nextPreloaded.id);
+      lastToken = nextPreloaded;
+    }
+
     // Store game state in Redis for validation
     const redis = getRedis();
     if (redis) {
@@ -91,6 +107,7 @@ export async function POST(request: NextRequest) {
       nextToken,
       timerDuration,
       startedAt,
+      preloadedTokens, // Preloaded tokens for smooth gameplay
     });
   } catch (error) {
     console.error('Error starting game:', error);

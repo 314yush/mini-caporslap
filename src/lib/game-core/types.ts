@@ -72,6 +72,7 @@ export interface GameState {
   streak: number;
   hasUsedReprieve: boolean;
   runId: string;
+  preloadedTokens: Token[]; // Queue of preloaded tokens ready to use
 }
 
 // A completed run (for leaderboard/sharing)

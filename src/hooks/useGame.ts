@@ -5,7 +5,8 @@ import {
   GameState, 
   Guess, 
   GuessResult,
-  Run 
+  Run,
+  Token
 } from '@/lib/game-core/types';
 import { compareMarketCaps, generateLossExplanation } from '@/lib/game-core/comparison';
 import { getReprieveState } from '@/lib/game-core/reprieve';
@@ -45,6 +46,7 @@ const initialGameState: GameState = {
   streak: 0,
   hasUsedReprieve: false,
   runId: '',
+  preloadedTokens: [],
 };
 
 /**
@@ -118,6 +120,7 @@ export function useGame(userId: string): UseGameReturn {
         runId: data.runId,
         currentToken: data.currentToken?.symbol,
         nextToken: data.nextToken?.symbol,
+        preloadedCount: data.preloadedTokens?.length || 0,
       });
       
       setGameState({
@@ -127,6 +130,7 @@ export function useGame(userId: string): UseGameReturn {
         streak: 0,
         hasUsedReprieve: false,
         runId: data.runId,
+        preloadedTokens: data.preloadedTokens || [],
       });
     } catch (err) {
       console.error('[useGame] startGame error:', err);
@@ -198,14 +202,71 @@ export function useGame(userId: string): UseGameReturn {
     }
   }, [gameState, userId]);
 
+  // Background fetch more tokens when running low
+  const fetchMoreTokens = useCallback(async (currentTokenId: string, recentTokenIds: string[]) => {
+    try {
+      const response = await fetch('/api/tokens/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          currentTokenId,
+          recentTokenIds,
+          count: 5,
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.tokens && data.tokens.length > 0) {
+          setGameState(prev => ({
+            ...prev,
+            preloadedTokens: [...prev.preloadedTokens, ...data.tokens],
+          }));
+          console.log('[useGame] Preloaded', data.tokens.length, 'more tokens');
+        }
+      }
+    } catch (err) {
+      console.error('[useGame] Failed to preload tokens:', err);
+      // Non-critical, don't show error to user
+    }
+  }, []);
+
   // Continue after correct guess animation
   const continueAfterCorrect = useCallback(async () => {
     if (gameState.phase !== 'correct') return;
     
+    // Use preloaded token if available (instant, no loading)
+    if (gameState.preloadedTokens.length > 0) {
+      const nextPreloaded = gameState.preloadedTokens[0];
+      const remainingPreloaded = gameState.preloadedTokens.slice(1);
+      
+      setGameState(prev => ({
+        ...prev,
+        phase: 'playing',
+        currentToken: prev.nextToken,
+        nextToken: nextPreloaded,
+        preloadedTokens: remainingPreloaded,
+      }));
+      
+      // If we're running low on preloaded tokens, fetch more in background
+      if (remainingPreloaded.length <= 2) {
+        const recentIds = [
+          gameState.currentToken?.id,
+          gameState.nextToken?.id,
+          nextPreloaded.id,
+        ].filter(Boolean) as string[];
+        
+        // Fire and forget - fetch more tokens in background
+        fetchMoreTokens(nextPreloaded.id, recentIds);
+      }
+      
+      return; // No loading state needed!
+    }
+    
+    // Fallback: fetch from API if no preloaded tokens (shouldn't happen normally)
     setIsLoading(true);
     
     try {
-      // Fetch next token
       const response = await fetch('/api/tokens/next', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -232,7 +293,7 @@ export function useGame(userId: string): UseGameReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [gameState]);
+  }, [gameState, fetchMoreTokens]);
 
   // Activate reprieve (called AFTER payment is verified)
   // This just resumes the game - payment verification happens separately
@@ -240,6 +301,34 @@ export function useGame(userId: string): UseGameReturn {
     if (gameState.phase !== 'loss') return;
     if (gameState.hasUsedReprieve) return;
     if (gameState.streak < 5) return; // Min streak requirement
+    
+    // Use preloaded token if available
+    if (gameState.preloadedTokens.length > 0) {
+      const nextPreloaded = gameState.preloadedTokens[0];
+      const remainingPreloaded = gameState.preloadedTokens.slice(1);
+      
+      setGameState(prev => ({
+        ...prev,
+        phase: 'playing',
+        nextToken: nextPreloaded,
+        hasUsedReprieve: true,
+        preloadedTokens: remainingPreloaded,
+      }));
+      
+      setLastResult(null);
+      setCompletedRun(null);
+      
+      // Fetch more tokens in background if needed
+      if (remainingPreloaded.length <= 2 && gameState.currentToken) {
+        const recentIds = [
+          gameState.currentToken.id,
+          nextPreloaded.id,
+        ].filter(Boolean) as string[];
+        fetchMoreTokens(nextPreloaded.id, recentIds);
+      }
+      
+      return;
+    }
     
     setIsLoading(true);
     
@@ -277,12 +366,15 @@ export function useGame(userId: string): UseGameReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [gameState]);
+  }, [gameState, fetchMoreTokens]);
 
   // Play again (start fresh)
   const playAgain = useCallback(() => {
     // Reset to initial state, then start new game
-    setGameState(initialGameState);
+    setGameState({
+      ...initialGameState,
+      preloadedTokens: [],
+    });
     setLastResult(null);
     setCompletedRun(null);
     setOvertakes([]);
