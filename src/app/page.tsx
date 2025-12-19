@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks';
 import { GameScreen } from '@/components/game';
-import { LandingPage } from '@/components/landing';
+import { LandingPage, OnboardingModal } from '@/components/landing';
+
+const ONBOARDING_SEEN_KEY = 'caporslap_onboarding_seen';
 
 export default function Home() {
   const { isReady, isAuthenticated, login, isLoading, fid, user } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
   
   // Debug logging for auth state changes
   useEffect(() => {
@@ -18,6 +22,25 @@ export default function Home() {
       user: user ? { fid: user.fid, username: user.username } : null,
     });
   }, [isReady, isAuthenticated, isLoading, fid, user]);
+
+  // Check if user has seen onboarding after authentication
+  useEffect(() => {
+    if (isReady && isAuthenticated && !onboardingChecked) {
+      const hasSeenOnboarding = localStorage.getItem(ONBOARDING_SEEN_KEY) === 'true';
+      setShowOnboarding(!hasSeenOnboarding);
+      setOnboardingChecked(true);
+    }
+  }, [isReady, isAuthenticated, onboardingChecked]);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = () => {
+    localStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
+    setShowOnboarding(false);
+  };
   
   // Show loading while initializing
   if (!isReady) {
@@ -36,6 +59,20 @@ export default function Home() {
   if (!isAuthenticated) {
     console.log('[Page] Rendering: Landing page (isAuthenticated=false)');
     return <LandingPage onLogin={login} isLoading={isLoading} />;
+  }
+  
+  // Show onboarding modal for first-time users
+  if (showOnboarding) {
+    console.log('[Page] Rendering: Onboarding modal');
+    return (
+      <div className="min-h-screen bg-black">
+        <OnboardingModal
+          isOpen={showOnboarding}
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      </div>
+    );
   }
   
   // Show game if authenticated

@@ -39,32 +39,35 @@ export function ConsoleLogger({ maxLogs = 100, enabled = true }: ConsoleLoggerPr
     return `log-${Date.now()}-${++logIdCounter.current}`;
   }, []);
 
-  // Add log entry
+  // Add log entry - deferred to avoid setState during render
   const addLog = useCallback((level: LogEntry['level'], ...args: unknown[]) => {
     if (!enabled) return;
 
-    const message = args
-      .map((arg) => {
-        if (typeof arg === 'string') return arg;
-        try {
-          return JSON.stringify(arg, null, 2);
-        } catch {
-          return String(arg);
-        }
-      })
-      .join(' ');
+    // Defer state update to avoid setState during render
+    queueMicrotask(() => {
+      const message = args
+        .map((arg) => {
+          if (typeof arg === 'string') return arg;
+          try {
+            return JSON.stringify(arg, null, 2);
+          } catch {
+            return String(arg);
+          }
+        })
+        .join(' ');
 
-    const entry: LogEntry = {
-      id: generateLogId(),
-      level,
-      message,
-      data: args.length > 1 ? args.slice(1) : undefined,
-      timestamp: Date.now(),
-    };
+      const entry: LogEntry = {
+        id: generateLogId(),
+        level,
+        message,
+        data: args.length > 1 ? args.slice(1) : undefined,
+        timestamp: Date.now(),
+      };
 
-    setLogs((prev) => {
-      const newLogs = [entry, ...prev].slice(0, maxLogs);
-      return newLogs;
+      setLogs((prev) => {
+        const newLogs = [entry, ...prev].slice(0, maxLogs);
+        return newLogs;
+      });
     });
   }, [enabled, maxLogs, generateLogId]);
 
