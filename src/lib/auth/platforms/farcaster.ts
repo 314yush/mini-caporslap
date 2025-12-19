@@ -5,10 +5,9 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import { detectEnvironment } from '@/lib/environment';
 import { useAuthDev } from '@/hooks/useAuthDev';
-import type { AuthProvider, PlatformUser } from '../types';
+import type { PlatformUser } from '../types';
 
 // Session storage keys
 const AUTH_TOKEN_KEY = 'caporslap_auth_token';
@@ -19,39 +18,6 @@ interface FarcasterUser {
   username?: string;
   displayName?: string;
   pfpUrl?: string;
-}
-
-/**
- * Creates a Farcaster auth provider
- * Uses Quick Auth in production, dev wallet auth in development
- */
-export function createFarcasterAuthProvider(): AuthProvider {
-  const [isReady, setIsReady] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [fid, setFid] = useState<number | null>(null);
-  const [user, setUser] = useState<FarcasterUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-
-  // Check if we're in development mode (not in Base App)
-  const isDevelopment = typeof window !== 'undefined' && detectEnvironment() === 'web';
-  
-  // Note: useAuthDev is a hook, so we need to handle this differently
-  // For now, we'll keep the logic in useAuth and call this from there
-  // This is a factory function that will be used by the hook
-
-  // This will be implemented as a hook wrapper in useAuth.ts
-  // The actual implementation stays there for now to maintain hook rules
-  return {
-    isReady: false,
-    isAuthenticated: false,
-    isLoading: false,
-    userId: null,
-    user: null,
-    token: null,
-    login: async () => {},
-    logout: () => {},
-  };
 }
 
 /**
