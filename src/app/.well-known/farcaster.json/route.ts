@@ -47,7 +47,6 @@ export async function GET() {
         `${appUrl}/images/miniapp/screenshots/screenshot-2-gameplay.png`,
         `${appUrl}/images/miniapp/screenshots/screenshot-3-leaderboard.png`,
         `${appUrl}/images/miniapp/screenshots/screenshot-4-loss.png`,
-        `${appUrl}/images/miniapp/screenshots/screenshot-5-streak.png`,
       ],
       primaryCategory: 'social',
       tags: ['crypto', 'game', 'base', 'miniapp', 'marketcap'],
