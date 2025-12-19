@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   description: 'Guess if the next token has a higher or lower market cap. Build streaks, compete globally.',
   keywords: ['crypto', 'game', 'market cap', 'higher lower', 'tokens', 'defi'],
   authors: [{ name: 'CapOrSlap' }],
+  manifest: '/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/apple-icon.png',
+  },
   other: {
     'base:app_id': '694491c9d77c069a945be088',
     'fc:miniapp': JSON.stringify({

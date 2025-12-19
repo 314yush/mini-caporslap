@@ -77,7 +77,26 @@ export function useReprievePayment(): UseReprievePaymentReturn {
     
     try {
       // Dynamically import to avoid SSR issues
-      const { pay, getPaymentStatus } = await import('@base-org/account');
+      // Wrap in retry logic to handle chunk loading failures after deployments
+      let baseAccount;
+      try {
+        baseAccount = await import('@base-org/account');
+      } catch (chunkError) {
+        // Chunk loading failed (likely stale deployment) - try one reload
+        console.warn('[Reprieve] Chunk load failed, attempting reload...', chunkError);
+        
+        // If this is a ChunkLoadError, suggest reload
+        if (chunkError instanceof Error && chunkError.name === 'ChunkLoadError') {
+          // Force reload the page to get fresh chunks
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+          throw new Error('App updated - please try again');
+        }
+        throw chunkError;
+      }
+      
+      const { pay, getPaymentStatus } = baseAccount;
       
       const testnet = isTestnet();
       

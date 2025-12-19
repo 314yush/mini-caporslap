@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Run } from '@/lib/game-core/types';
 import { formatMarketCap } from '@/lib/game-core/comparison';
-import { shareRun, getSharePreview } from '@/lib/social/sharing';
+import { generateShareData, generateShareText, shareToClipboard, getSharePreview } from '@/lib/social/sharing';
+import { miniAppComposeCast } from '@/lib/farcaster/sdk';
 import { canOfferReprieve, getReprieveCopy, isReprieveFree } from '@/lib/game-core/reprieve';
 import { useReprievePayment, PaymentStatus } from '@/hooks/useReprievePayment';
 
@@ -69,10 +70,28 @@ export function LossScreen({
 
   const handleShare = async () => {
     setSharing(true);
-    const success = await shareRun(run);
-    if (success) {
+    const shareData = generateShareData(run);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mini.caporslap.fun';
+    
+    // Try composeCast first (native Mini App share)
+    const shareText = `${shareData.message}\n\nCan you beat me?`;
+    const castSuccess = await miniAppComposeCast({
+      text: shareText,
+      embeds: [appUrl],
+    });
+    
+    if (castSuccess) {
+      // Cast composer opened successfully
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } else {
+      // Fallback to clipboard for web users
+      const fullText = generateShareText(shareData);
+      const clipboardSuccess = await shareToClipboard(fullText);
+      if (clipboardSuccess) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     }
     setSharing(false);
   };
@@ -267,7 +286,7 @@ export function LossScreen({
               </div>
             )}
 
-            {/* Share button */}
+            {/* Share button - uses composeCast in Mini App */}
             <button
               onClick={handleShare}
               disabled={sharing || isPaying}
@@ -281,7 +300,7 @@ export function LossScreen({
                 disabled:opacity-50
               "
             >
-              {copied ? '✅ Copied!' : sharing ? 'Sharing...' : '📤 Share My L'}
+              {copied ? '✅ Shared!' : sharing ? 'Opening...' : '📣 Cast My L'}
             </button>
 
             {/* Play Again button - renamed from Walk Away */}

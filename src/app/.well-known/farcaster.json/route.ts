@@ -30,13 +30,17 @@ export async function GET() {
     signature: process.env.ACCOUNT_ASSOCIATION_SIGNATURE ?? '',
   };
 
+  // Base Mini Apps expect the "frame" key (not "miniapp") for search indexing
+  // See: https://docs.base.org/mini-apps/troubleshooting/how-search-works
   const manifest = {
     accountAssociation,
-    miniapp: withValidProperties({
+    frame: withValidProperties({
       version: '1',
       name: 'CapOrSlap',
       homeUrl: appUrl,
       iconUrl: `${appUrl}/images/miniapp/icon-512.png`,
+      imageUrl: `${appUrl}/images/miniapp/hero-1200x630.png`, // Required for embeds
+      buttonTitle: 'Play Now', // Required for embeds
       splashImageUrl: `${appUrl}/images/miniapp/splash-1200.png`,
       splashBackgroundColor: '#09090b',
       subtitle: 'Higher or lower for crypto',
@@ -47,7 +51,7 @@ export async function GET() {
         `${appUrl}/images/miniapp/screenshots/screenshot-2-gameplay.png`,
         `${appUrl}/images/miniapp/screenshots/screenshot-3-leaderboard.png`,
       ],
-      primaryCategory: 'social',
+      primaryCategory: 'games', // Changed from 'social' to 'games' for better discoverability
       tags: ['crypto', 'game', 'base', 'miniapp', 'marketcap'],
       heroImageUrl: `${appUrl}/images/miniapp/hero-1200x630.png`,
       tagline: 'Beat your streak.',
