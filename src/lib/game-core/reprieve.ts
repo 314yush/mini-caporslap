@@ -1,0 +1,278 @@
+/**
+ * Reprieve system - allows continuing a streak once after losing
+ * This is a monetization feature - pay $1 to continue
+ * Payment integration hooks ready for future implementation
+ */
+
+export interface ReprieveState {
+  available: boolean;
+  used: boolean;
+  price: number;
+  minStreak: number;
+  currency: 'USD' | 'ETH' | 'USDC';
+}
+
+export interface ReprieveResult {
+  success: boolean;
+  paymentRequired: boolean;
+  paymentAmount?: number;
+  paymentCurrency?: 'USD' | 'ETH' | 'USDC';
+  transactionId?: string;
+  error?: string;
+}
+
+export interface PaymentRequest {
+  userId: string;
+  runId: string;
+  amount: number;
+  currency: 'USD' | 'ETH' | 'USDC';
+  streak: number;
+}
+
+// Minimum streak required to unlock reprieve
+const MIN_STREAK_FOR_REPRIEVE = 5;
+const REPRIEVE_PRICE = 1.00; // $1 USD
+const REPRIEVE_CURRENCY = 'USD' as const;
+
+// Feature flag for free reprieves during testing
+const REPRIEVE_FREE = process.env.NEXT_PUBLIC_REPRIEVE_FREE === 'true';
+
+/**
+ * Checks if reprieve can be offered
+ * @param streak - Current streak
+ * @param hasUsedReprieve - Whether reprieve was already used this run
+ * @returns Whether reprieve is available
+ */
+export function canOfferReprieve(
+  streak: number,
+  hasUsedReprieve: boolean
+): boolean {
+  // Can only use once per run
+  if (hasUsedReprieve) return false;
+  
+  // Must meet minimum streak
+  return streak >= MIN_STREAK_FOR_REPRIEVE;
+}
+
+/**
+ * Gets reprieve state for display
+ * @param streak - Current streak
+ * @param hasUsedReprieve - Whether reprieve was already used
+ * @returns Reprieve state object
+ */
+export function getReprieveState(
+  streak: number,
+  hasUsedReprieve: boolean
+): ReprieveState {
+  return {
+    available: canOfferReprieve(streak, hasUsedReprieve),
+    used: hasUsedReprieve,
+    price: REPRIEVE_PRICE,
+    minStreak: MIN_STREAK_FOR_REPRIEVE,
+    currency: REPRIEVE_CURRENCY,
+  };
+}
+
+/**
+ * Generates the reprieve offer copy
+ * @param streak - Current streak
+ * @returns Copy for the reprieve button
+ */
+export function getReprieveCopy(streak: number): {
+  title: string;
+  description: string;
+  buttonText: string;
+  emoji: string;
+} {
+  const priceText = REPRIEVE_FREE 
+    ? 'FREE (testing)' 
+    : `$${REPRIEVE_PRICE.toFixed(2)}`;
+  
+  return {
+    title: 'One Last Candle',
+    description: `Keep your ${streak} streak alive`,
+    buttonText: `Continue for ${priceText}`,
+    emoji: '🕯️',
+  };
+}
+
+/**
+ * Gets the minimum streak required for reprieve
+ */
+export function getMinStreakForReprieve(): number {
+  return MIN_STREAK_FOR_REPRIEVE;
+}
+
+/**
+ * Gets the reprieve price
+ */
+export function getReprievePrice(): number {
+  return REPRIEVE_PRICE;
+}
+
+/**
+ * Check if reprieves are currently free
+ */
+export function isReprieveFree(): boolean {
+  return REPRIEVE_FREE;
+}
+
+// ===========================================
+// PAYMENT INTEGRATION HOOKS
+// ===========================================
+
+/**
+ * Payment provider interface
+ * Implement this for different payment methods
+ */
+export interface PaymentProvider {
+  name: string;
+  processPayment(request: PaymentRequest): Promise<ReprieveResult>;
+  verifyPayment(transactionId: string): Promise<boolean>;
+}
+
+/**
+ * Mock payment provider for testing
+ */
+export const mockPaymentProvider: PaymentProvider = {
+  name: 'mock',
+  async processPayment(request: PaymentRequest): Promise<ReprieveResult> {
+    console.log('[Reprieve] Mock payment processed:', request);
+    
+    // Simulate payment delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return {
+      success: true,
+      paymentRequired: false,
+      transactionId: `mock_${Date.now()}_${request.runId}`,
+    };
+  },
+  async verifyPayment(transactionId: string): Promise<boolean> {
+    return transactionId.startsWith('mock_');
+  },
+};
+
+/**
+ * Stripe payment provider placeholder
+ * TODO: Implement when ready
+ */
+export const stripePaymentProvider: PaymentProvider = {
+  name: 'stripe',
+  async processPayment(request: PaymentRequest): Promise<ReprieveResult> {
+    // TODO: Implement Stripe payment intent creation
+    // 1. Create payment intent on server
+    // 2. Return client secret for frontend to complete
+    // 3. Verify payment webhook
+    
+    console.log('[Reprieve] Stripe payment not yet implemented:', request);
+    return {
+      success: false,
+      paymentRequired: true,
+      paymentAmount: request.amount,
+      paymentCurrency: request.currency,
+      error: 'Stripe payments not yet implemented',
+    };
+  },
+  async verifyPayment(_transactionId: string): Promise<boolean> {
+    // TODO: Verify with Stripe API
+    return false;
+  },
+};
+
+/**
+ * Crypto payment provider placeholder (USDC, ETH)
+ * TODO: Implement when ready
+ */
+export const cryptoPaymentProvider: PaymentProvider = {
+  name: 'crypto',
+  async processPayment(request: PaymentRequest): Promise<ReprieveResult> {
+    // TODO: Implement crypto payment
+    // 1. Generate payment address or use Coinbase Commerce
+    // 2. Wait for confirmation
+    // 3. Verify on-chain
+    
+    console.log('[Reprieve] Crypto payment not yet implemented:', request);
+    return {
+      success: false,
+      paymentRequired: true,
+      paymentAmount: request.amount,
+      paymentCurrency: request.currency,
+      error: 'Crypto payments not yet implemented',
+    };
+  },
+  async verifyPayment(_transactionId: string): Promise<boolean> {
+    // TODO: Verify on-chain
+    return false;
+  },
+};
+
+/**
+ * Get the active payment provider
+ */
+export function getPaymentProvider(): PaymentProvider {
+  // During testing, use mock provider if reprieve is free
+  if (REPRIEVE_FREE) {
+    return mockPaymentProvider;
+  }
+  
+  // TODO: Select based on user preference or config
+  // For now, default to mock
+  return mockPaymentProvider;
+}
+
+/**
+ * Process a reprieve request
+ * Main entry point for reprieve payment
+ */
+export async function processReprieve(
+  userId: string,
+  runId: string,
+  streak: number,
+  hasUsedReprieve: boolean
+): Promise<ReprieveResult> {
+  // Check if reprieve is available
+  if (!canOfferReprieve(streak, hasUsedReprieve)) {
+    return {
+      success: false,
+      paymentRequired: false,
+      error: hasUsedReprieve 
+        ? 'Reprieve already used this run' 
+        : `Minimum streak of ${MIN_STREAK_FOR_REPRIEVE} required`,
+    };
+  }
+  
+  // If free, just allow it
+  if (REPRIEVE_FREE) {
+    return {
+      success: true,
+      paymentRequired: false,
+      transactionId: `free_${Date.now()}_${runId}`,
+    };
+  }
+  
+  // Process payment
+  const provider = getPaymentProvider();
+  const request: PaymentRequest = {
+    userId,
+    runId,
+    amount: REPRIEVE_PRICE,
+    currency: REPRIEVE_CURRENCY,
+    streak,
+  };
+  
+  return provider.processPayment(request);
+}
+
+/**
+ * Verify a reprieve payment was completed
+ */
+export async function verifyReprievePayment(transactionId: string): Promise<boolean> {
+  // Free reprieves are always valid
+  if (transactionId.startsWith('free_')) {
+    return true;
+  }
+  
+  const provider = getPaymentProvider();
+  return provider.verifyPayment(transactionId);
+}
