@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        console.log('[Webhook] Unknown event type:', event.event);
+        console.log('[Webhook] Unknown event type');
     }
 
     // Always return 200 quickly to acknowledge receipt
