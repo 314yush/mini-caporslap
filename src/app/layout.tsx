@@ -80,7 +80,6 @@ export default function RootLayout({
             {children}
           </MiniAppProvider>
         </PostHogProvider>
-        <ConsoleLogger enabled={true} />
         <Analytics />
         <SpeedInsights />
       </body>

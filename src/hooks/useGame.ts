@@ -294,7 +294,6 @@ export function useGame(userId: string): UseGameReturn {
             ...prev,
             preloadedTokens: [...prev.preloadedTokens, ...data.tokens],
           }));
-          console.log('[useGame] Preloaded', data.tokens.length, 'more tokens');
         }
       }
     } catch (err) {
@@ -478,16 +477,8 @@ export function useGame(userId: string): UseGameReturn {
 
   // Auto-start game on mount or after playAgain
   useEffect(() => {
-    console.log('[useGame] Auto-start check:', { 
-      hasRunId: !!gameState.runId, 
-      userId,
-      shouldStart: !gameState.runId && userId 
-    });
     if (!gameState.runId && userId) {
-      console.log('[useGame] Starting game for userId:', userId);
       startGame();
-    } else if (!userId) {
-      console.log('[useGame] Cannot start game - no userId');
     }
   }, [userId, gameState.runId, startGame]);
 

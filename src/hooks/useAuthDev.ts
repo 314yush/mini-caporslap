@@ -94,8 +94,6 @@ export function useAuthDev() {
     sessionStorage.removeItem('dev_auth_address');
     sessionStorage.removeItem('dev_auth_fid');
     sessionStorage.removeItem('dev_auth_user');
-    
-    console.log('[Dev Auth] Disconnected');
   }, []);
 
   // Restore session on mount
@@ -109,7 +107,6 @@ export function useAuthDev() {
       setMockFid(Number(storedFid));
       setMockUser(JSON.parse(storedUser));
       setIsConnected(true);
-      console.log('[Dev Auth] Restored session:', { address: storedAddress, fid: storedFid });
     }
   }, []);
 
