@@ -46,25 +46,42 @@ export async function GET() {
       splashBackgroundColor: '#09090b',
       
       // Required: Discovery & Search
+      // Search queries the 'name' field - "CapOrSlap" is searchable
+      // Category browsing uses primaryCategory - appears in "games" category
+      // Tags help with filtering and discovery (max 5, lowercase, no spaces/special chars)
       primaryCategory: 'games',
-      tags: ['crypto', 'game', 'base', 'marketcap'],
+      tags: [
+        'crypto',        // Main category
+        'game',          // Game type
+        'trading',       // Trading/guessing aspect
+        'leaderboard',   // Competitive feature
+        'defi',          // DeFi/crypto focus
+      ],
       
       // Required: Display Information
-      tagline: 'Beat your streak.',
+      // Tagline appears in search results (max 30 chars)
+      tagline: 'Higher or lower crypto game',
       heroImageUrl: `${appUrl}/images/miniapp/hero-1200x630.png`,
+      // Screenshots help with discovery - showing gameplay, features
       screenshotUrls: [
         `${appUrl}/images/miniapp/screenshots/screenshot-1-landing.png`,
         `${appUrl}/images/miniapp/screenshots/screenshot-2-gameplay.png`,
         `${appUrl}/images/miniapp/screenshots/screenshot-3-leaderboard.png`,
+        // Add loss screen if available for more context
+        `${appUrl}/images/miniapp/screenshots/screenshot-4-loss.png`,
       ],
       
       // Optional: Display Information
+      // These help with search and discovery
       subtitle: 'Higher or lower for crypto',
-      description: 'Guess if the next token has a higher or lower market cap. Build streaks, compete globally.',
+      // Description should be keyword-rich for search indexing
+      description: 'Guess if crypto tokens have higher or lower market caps. Build streaks, compete on leaderboards, and test your crypto knowledge. Play the ultimate higher or lower game for cryptocurrency market caps.',
       
       // Optional: Embeds & Social Sharing
-      ogTitle: 'CapOrSlap',
-      ogDescription: 'Higher or lower for crypto market caps.',
+      // These appear when sharing the app URL in DMs or feeds
+      // Better descriptions = better click-through rates
+      ogTitle: 'CapOrSlap - Higher or Lower Crypto Game',
+      ogDescription: 'Guess if crypto tokens have higher or lower market caps. Build streaks and compete on leaderboards. Play the ultimate crypto market cap guessing game on Base.',
       ogImageUrl: `${appUrl}/images/miniapp/hero-1200x630.png`,
       
       // Optional: Search indexing (false = include in search)
