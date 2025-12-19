@@ -3,6 +3,7 @@ import { Space_Grotesk } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { MiniAppProvider } from '@/components/providers/MiniAppProvider';
+import { ConsoleLogger } from '@/components/debug';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -69,6 +70,7 @@ export default function RootLayout({
         <MiniAppProvider>
           {children}
         </MiniAppProvider>
+        <ConsoleLogger enabled={true} />
         <Analytics />
         <SpeedInsights />
       </body>

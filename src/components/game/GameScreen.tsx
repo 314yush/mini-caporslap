@@ -19,6 +19,10 @@ export function GameScreen() {
   const { fid } = useAuth();
   // Use FID as the user identifier
   const userId = fid ? String(fid) : (user?.userId || '');
+  
+  // Debug logging
+  console.log('[GameScreen] Rendering with:', { fid, userId, identityLoading });
+  
   const {
     gameState,
     isLoading,
@@ -33,6 +37,18 @@ export function GameScreen() {
     liveOvertakes,
     clearLiveOvertakes,
   } = useGame(userId);
+  
+  // Debug: Log game state changes
+  useEffect(() => {
+    console.log('[GameScreen] Game state:', {
+      phase: gameState.phase,
+      streak: gameState.streak,
+      currentToken: gameState.currentToken?.symbol,
+      nextToken: gameState.nextToken?.symbol,
+      isLoading,
+      error,
+    });
+  }, [gameState, isLoading, error]);
 
   // Timer management
   const handleTimerExpire = useCallback(() => {

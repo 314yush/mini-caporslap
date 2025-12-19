@@ -88,6 +88,7 @@ export function useGame(userId: string): UseGameReturn {
 
   // Start a new game
   const startGame = useCallback(async () => {
+    console.log('[useGame] startGame() called for userId:', userId);
     setIsLoading(true);
     setError(null);
     setLastResult(null);
@@ -97,17 +98,27 @@ export function useGame(userId: string): UseGameReturn {
     
     try {
       // Fetch initial tokens from API
+      console.log('[useGame] Calling /api/game/start...');
       const response = await fetch('/api/game/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
       
+      console.log('[useGame] /api/game/start response status:', response.status);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[useGame] Failed to start game:', errorText);
         throw new Error('Failed to start game');
       }
       
       const data = await response.json();
+      console.log('[useGame] Game started:', {
+        runId: data.runId,
+        currentToken: data.currentToken?.symbol,
+        nextToken: data.nextToken?.symbol,
+      });
       
       setGameState({
         phase: 'playing',
@@ -118,6 +129,7 @@ export function useGame(userId: string): UseGameReturn {
         runId: data.runId,
       });
     } catch (err) {
+      console.error('[useGame] startGame error:', err);
       setError(err instanceof Error ? err.message : 'Failed to start game');
     } finally {
       setIsLoading(false);
@@ -279,8 +291,16 @@ export function useGame(userId: string): UseGameReturn {
 
   // Auto-start game on mount or after playAgain
   useEffect(() => {
+    console.log('[useGame] Auto-start check:', { 
+      hasRunId: !!gameState.runId, 
+      userId,
+      shouldStart: !gameState.runId && userId 
+    });
     if (!gameState.runId && userId) {
+      console.log('[useGame] Starting game for userId:', userId);
       startGame();
+    } else if (!userId) {
+      console.log('[useGame] Cannot start game - no userId');
     }
   }, [userId, gameState.runId, startGame]);
 
