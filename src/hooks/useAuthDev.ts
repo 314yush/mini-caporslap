@@ -76,8 +76,6 @@ export function useAuthDev() {
       sessionStorage.setItem('dev_auth_address', address);
       sessionStorage.setItem('dev_auth_fid', String(fid));
       sessionStorage.setItem('dev_auth_user', JSON.stringify(user));
-
-      console.log('[Dev Auth] Connected:', { address, fid, user });
     } catch (error) {
       console.error('[Dev Auth] Connection failed:', error);
       throw error;

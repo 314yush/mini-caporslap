@@ -51,15 +51,11 @@ export function useAuth(): AuthState {
 
   // Check for existing session on mount
   useEffect(() => {
-    console.log('[useAuth] Checking for existing session...');
-    console.log('[useAuth] Environment:', isDevelopment ? 'development (web)' : 'production (Base App)');
-    
     const checkExistingSession = async () => {
       try {
         const session = await FarcasterAuthHelpers.checkExistingSession(isDevelopment, devAuth);
         
         if (session) {
-          console.log('[useAuth] Restored session for FID:', session.fid);
           setToken(session.token);
           setUser(session.user);
           setFid(session.fid);
@@ -68,15 +64,12 @@ export function useAuth(): AuthState {
           // Also set platform user for unified interface
           const platform = farcasterUserToPlatformUser(session.user, session.token);
           setPlatformUser(platform);
-        } else {
-          console.log('[useAuth] No existing session found');
         }
       } catch (error) {
         console.error('[useAuth] Error checking existing session:', error);
         // Clear invalid session data
         FarcasterAuthHelpers.logout(isDevelopment, devAuth);
       } finally {
-        console.log('[useAuth] Setting isReady=true');
         setIsReady(true);
       }
     };
@@ -86,14 +79,12 @@ export function useAuth(): AuthState {
 
   // Login using Quick Auth (production) or Wallet (development)
   const login = useCallback(async () => {
-    console.log('[useAuth] Login started...');
     setIsLoading(true);
     
     try {
       const result = await FarcasterAuthHelpers.login(isDevelopment, devAuth);
       
       // Store auth state
-      console.log('[useAuth] Setting auth state...');
       setToken(result.token);
       setUser(result.user);
       setFid(result.fid);
@@ -102,13 +93,10 @@ export function useAuth(): AuthState {
       // Also set platform user for unified interface
       const platform = farcasterUserToPlatformUser(result.user, result.token);
       setPlatformUser(platform);
-      
-      console.log('[useAuth] Authentication successful! FID:', result.fid);
     } catch (error) {
       console.error('[useAuth] Login failed:', error);
       throw error;
     } finally {
-      console.log('[useAuth] Login complete, setting isLoading=false');
       setIsLoading(false);
     }
   }, [isDevelopment, devAuth]);
@@ -123,8 +111,6 @@ export function useAuth(): AuthState {
     
     // Clear session using helper
     FarcasterAuthHelpers.logout(isDevelopment, devAuth);
-    
-    console.log('[useAuth] Logged out');
   }, [isDevelopment, devAuth]);
 
   return {

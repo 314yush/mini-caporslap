@@ -94,7 +94,6 @@ export function useGame(userId: string): UseGameReturn {
       if (response.ok) {
         const data = await response.json();
         if (data.overtakes && data.overtakes.length > 0) {
-          console.log('[useGame] Live overtakes:', data.overtakes);
           setLiveOvertakes(data.overtakes);
         }
       }
@@ -110,7 +109,6 @@ export function useGame(userId: string): UseGameReturn {
 
   // Start a new game
   const startGame = useCallback(async () => {
-    console.log('[useGame] startGame() called for userId:', userId);
     setIsLoading(true);
     setError(null);
     setLastResult(null);
@@ -120,14 +118,11 @@ export function useGame(userId: string): UseGameReturn {
     
     try {
       // Fetch initial tokens from API
-      console.log('[useGame] Calling /api/game/start...');
       const response = await fetch('/api/game/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
-      
-      console.log('[useGame] /api/game/start response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -136,12 +131,6 @@ export function useGame(userId: string): UseGameReturn {
       }
       
       const data = await response.json();
-      console.log('[useGame] Game started:', {
-        runId: data.runId,
-        currentToken: data.currentToken?.symbol,
-        nextToken: data.nextToken?.symbol,
-        preloadedCount: data.preloadedTokens?.length || 0,
-      });
       
       const now = Date.now();
       gameStartTimeRef.current = now;
@@ -278,7 +267,6 @@ export function useGame(userId: string): UseGameReturn {
         .then(res => res.json())
         .then(data => {
           if (data.overtakes && data.overtakes.length > 0) {
-            console.log('[useGame] Overtakes detected:', data.overtakes);
             setOvertakes(data.overtakes);
           }
         })

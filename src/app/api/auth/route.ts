@@ -6,14 +6,11 @@ function getDomain(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) {
     try {
       const url = new URL(process.env.NEXT_PUBLIC_APP_URL);
-      const hostname = url.hostname;
-      console.log('[Auth] Using domain from NEXT_PUBLIC_APP_URL:', hostname);
-      return hostname;
+      return url.hostname;
     } catch {
       // If invalid URL, try to extract hostname manually
       const match = process.env.NEXT_PUBLIC_APP_URL.match(/https?:\/\/([^\/]+)/);
       if (match) {
-        console.log('[Auth] Extracted domain from NEXT_PUBLIC_APP_URL:', match[1]);
         return match[1];
       }
     }
@@ -25,20 +22,16 @@ function getDomain(): string {
       // VERCEL_URL might be just hostname or include protocol
       if (process.env.VERCEL_URL.startsWith('http')) {
         const url = new URL(process.env.VERCEL_URL);
-        console.log('[Auth] Using domain from VERCEL_URL:', url.hostname);
         return url.hostname;
       } else {
-        console.log('[Auth] Using VERCEL_URL as domain:', process.env.VERCEL_URL);
         return process.env.VERCEL_URL;
       }
     } catch {
-      console.log('[Auth] Using VERCEL_URL as-is:', process.env.VERCEL_URL);
       return process.env.VERCEL_URL;
     }
   }
   
   // Fallback for local development
-  console.log('[Auth] Using fallback domain: localhost:3000');
   return 'localhost:3000';
 }
 
@@ -51,21 +44,15 @@ const client = createClient();
  * Verifies Quick Auth JWT and returns user info (FID, username)
  */
 export async function GET(request: NextRequest) {
-  console.log('[Auth] Received auth request');
-  
   const authorization = request.headers.get('Authorization');
   if (!authorization?.startsWith('Bearer ')) {
-    console.log('[Auth] Missing or invalid Authorization header');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const token = authorization.split(' ')[1];
-  console.log('[Auth] Token received, length:', token.length);
 
   try {
-    console.log('[Auth] Verifying JWT with domain:', domain);
     const payload = await client.verifyJwt({ token, domain });
-    console.log('[Auth] JWT verified successfully, FID:', payload.sub);
     
     // Return FID (subject) - username can be resolved via Neynar if needed
     return NextResponse.json({

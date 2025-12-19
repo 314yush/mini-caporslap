@@ -31,9 +31,6 @@ export function GameScreen() {
   const lastGameEndTimeRef = useRef<number | null>(null);
   const sessionStartTimeRef = useRef<number | null>(null);
   
-  // Debug logging
-  console.log('[GameScreen] Rendering with:', { fid, userId, identityLoading });
-  
   // Initialize session tracking
   useEffect(() => {
     if (userId && !sessionStartTimeRef.current) {
@@ -106,17 +103,6 @@ export function GameScreen() {
     }
   }, [gameState.phase, gameState.streak]);
 
-  // Debug: Log game state changes
-  useEffect(() => {
-    console.log('[GameScreen] Game state:', {
-      phase: gameState.phase,
-      streak: gameState.streak,
-      currentToken: gameState.currentToken?.symbol,
-      nextToken: gameState.nextToken?.symbol,
-      isLoading,
-      error,
-    });
-  }, [gameState, isLoading, error]);
 
   // Timer management
   const handleTimerExpire = useCallback(() => {
