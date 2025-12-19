@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePrivy } from '@privy-io/react-auth';
 import { useAuth } from '@/hooks/useAuth';
 
 interface UserMenuProps {
@@ -11,8 +10,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ className = '' }: UserMenuProps) {
-  const { logout } = usePrivy();
-  const { identity, isGuest } = useAuth();
+  const { logout, user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   
@@ -28,14 +26,16 @@ export function UserMenu({ className = '' }: UserMenuProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  // Don't show menu for guests
-  if (isGuest || !identity) {
+  // Don't show menu if not authenticated
+  if (!isAuthenticated || !user) {
     return null;
   }
   
-  const displayName = identity.displayName || 'User';
-  const avatarUrl = identity.avatarUrl;
-  const initial = displayName.charAt(0).toUpperCase();
+  const displayName = user.username 
+    ? `@${user.username}` 
+    : user.displayName || `FID: ${user.fid}`;
+  const avatarUrl = user.pfpUrl;
+  const initial = (user.username || user.displayName || 'U').charAt(0).toUpperCase();
   
   return (
     <div className={`relative ${className}`} ref={menuRef}>
@@ -114,11 +114,9 @@ export function UserMenu({ className = '' }: UserMenuProps) {
                 <p className="text-sm font-semibold text-white truncate">
                   {displayName}
                 </p>
-                {identity.source !== 'address' && (
-                  <p className="text-xs text-zinc-500 capitalize">
-                    via {identity.source}
-                  </p>
-                )}
+                <p className="text-xs text-zinc-500">
+                  FID: {user.fid}
+                </p>
               </div>
             </div>
           </div>
@@ -152,7 +150,7 @@ export function UserMenu({ className = '' }: UserMenuProps) {
               "
             >
               <span className="text-lg">👋</span>
-              Disconnect
+              Sign Out
             </button>
           </div>
         </div>
@@ -165,19 +163,17 @@ export function UserMenu({ className = '' }: UserMenuProps) {
  * Compact user display (no dropdown)
  */
 export function UserDisplay({ className = '' }: { className?: string }) {
-  const { identity, isGuest } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   
-  if (isGuest || !identity) {
-    return (
-      <span className={`text-zinc-500 text-sm ${className}`}>
-        Guest
-      </span>
-    );
+  if (!isAuthenticated || !user) {
+    return null;
   }
   
-  const displayName = identity.displayName || 'User';
-  const avatarUrl = identity.avatarUrl;
-  const initial = displayName.charAt(0).toUpperCase();
+  const displayName = user.username 
+    ? `@${user.username}` 
+    : user.displayName || `FID: ${user.fid}`;
+  const avatarUrl = user.pfpUrl;
+  const initial = (user.username || user.displayName || 'U').charAt(0).toUpperCase();
   
   return (
     <div className={`flex items-center gap-2 ${className}`}>
@@ -201,4 +197,3 @@ export function UserDisplay({ className = '' }: { className?: string }) {
     </div>
   );
 }
-

@@ -6,22 +6,19 @@ import { formatMarketCap } from '@/lib/game-core/comparison';
 import { shareRun, getSharePreview } from '@/lib/social/sharing';
 import { canOfferReprieve, getReprieveCopy, isReprieveFree } from '@/lib/game-core/reprieve';
 import { useReprievePayment, PaymentStatus } from '@/hooks/useReprievePayment';
-import { SaveScorePrompt } from '@/components/auth/SaveScorePrompt';
-import { useAuth } from '@/hooks/useAuth';
 
 interface LossScreenProps {
   run: Run;
   lossExplanation: string | null;
   onPlayAgain: () => void;
   onReprieveComplete: () => void; // Called after payment verified, to resume game
-  isWalletConnected?: boolean;
 }
 
 // Get status text for payment flow
 function getStatusText(status: PaymentStatus): string {
   switch (status) {
-    case 'confirming': return 'Confirm in wallet...';
-    case 'pending': return 'Transaction pending...';
+    case 'confirming': return 'Confirm payment...';
+    case 'pending': return 'Payment pending...';
     case 'verifying': return 'Verifying payment...';
     case 'success': return 'Payment verified!';
     case 'error': return 'Payment failed';
@@ -34,14 +31,10 @@ export function LossScreen({
   lossExplanation: _lossExplanation, 
   onPlayAgain, 
   onReprieveComplete, 
-  isWalletConnected = false,
 }: LossScreenProps) {
   const [showActions, setShowActions] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
-  
-  // Auth hook to check if user is guest
-  const { isGuest } = useAuth();
   
   // Payment hook
   const { 
@@ -98,8 +91,8 @@ export function LossScreen({
   const reprieveCopy = showReprieve ? getReprieveCopy(run.streak) : null;
   const isFree = isReprieveFree();
   
-  // Determine if reprieve requires payment (wallet connected + not free mode)
-  const requiresPayment = isWalletConnected && !isFree;
+  // All users are authenticated, so paid reprieve is always available (unless free mode)
+  const requiresPayment = !isFree;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 px-6 overflow-y-auto py-8">
@@ -153,14 +146,6 @@ export function LossScreen({
               </div>
             </div>
           </div>
-        )}
-
-        {/* Save Score Prompt - for guests with good streaks */}
-        {showActions && isGuest && run.streak >= 3 && (
-          <SaveScorePrompt 
-            streak={run.streak} 
-            className="w-full animate-fade-in"
-          />
         )}
 
         {/* Actions */}
@@ -246,7 +231,7 @@ export function LossScreen({
                         </>
                       ) : (
                         <>
-                          {isFree || !isWalletConnected ? (
+                          {isFree ? (
                             'Continue FREE'
                           ) : (
                             <>
@@ -264,18 +249,11 @@ export function LossScreen({
                   {/* Info note */}
                   <p className="text-amber-400/50 text-xs text-center">
                     {requiresPayment ? (
-                      <>USDC on Base • One-time use per run</>
+                      <>USDC via Base Pay • One-time use per run</>
                     ) : (
                       <>One-time use per run • Your streak stays intact</>
                     )}
                   </p>
-                  
-                  {/* Guest mode hint */}
-                  {!isWalletConnected && !isFree && (
-                    <p className="text-zinc-500 text-xs text-center">
-                      Connect wallet to pay with USDC
-                    </p>
-                  )}
                 </div>
               </div>
             )}

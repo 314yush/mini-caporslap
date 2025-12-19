@@ -1,14 +1,22 @@
 'use client';
 
 import Image from 'next/image';
-import { ConnectButton } from '@/components/auth/ConnectButton';
 import { assets } from '@/lib/branding';
 
 interface LandingPageProps {
-  onPlayAsGuest: () => void;
+  onLogin: () => Promise<void>;
+  isLoading?: boolean;
 }
 
-export function LandingPage({ onPlayAsGuest }: LandingPageProps) {
+export function LandingPage({ onLogin, isLoading = false }: LandingPageProps) {
+  const handleLogin = async () => {
+    try {
+      await onLogin();
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-0 sm:px-4 md:px-6 bg-black relative py-16 pb-20 sm:py-20 sm:pb-24 md:py-24 md:pb-6 overflow-x-hidden">
       {/* Main Content */}
@@ -55,15 +63,36 @@ export function LandingPage({ onPlayAsGuest }: LandingPageProps) {
           </div>
         </div>
         
-        {/* CTA Buttons */}
+        {/* CTA Button */}
         <div className="flex flex-col items-center gap-2 sm:gap-3 w-full mb-4 sm:mb-6 md:mb-8 lg:mb-12 px-2 sm:px-4">
-          <ConnectButton className="w-full max-w-[280px] sm:max-w-xs md:max-w-sm" size="lg" />
           <button
-            onClick={onPlayAsGuest}
-            className="text-xs sm:text-sm text-white/80 hover:text-white underline underline-offset-4 transition-colors"
+            onClick={handleLogin}
+            disabled={isLoading}
+            className={`
+              w-full max-w-[280px] sm:max-w-xs md:max-w-sm
+              py-4 px-8 text-lg
+              rounded-2xl font-bold
+              bg-gradient-to-r from-amber-500 to-orange-500
+              hover:from-amber-400 hover:to-orange-400
+              text-white shadow-lg shadow-amber-500/25
+              transform transition-all duration-200
+              hover:scale-105 active:scale-95
+              disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+              flex items-center justify-center gap-2
+            `}
           >
-            or play as guest
+            {isLoading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign In to Play'
+            )}
           </button>
+          <p className="text-xs text-zinc-500">
+            Sign in with your Farcaster account
+          </p>
         </div>
         
         {/* Comparison Cards */}
@@ -182,4 +211,3 @@ function ComparisonCard({
     </div>
   );
 }
-

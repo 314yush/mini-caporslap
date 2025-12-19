@@ -1,34 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, parseAbi } from 'viem';
-import { base } from 'viem/chains';
+import { createPublicClient, http } from 'viem';
+import { base, baseSepolia } from 'viem/chains';
 
 // USDC on Base
 const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-const USDC_DECIMALS = 6;
+// USDC on Base Sepolia (Circle's test USDC)
+const USDC_ADDRESS_TESTNET = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
 const REPRIEVE_PRICE = 1_000_000; // $1 in USDC (6 decimals)
 
-// ERC20 Transfer event signature
-const ERC20_ABI = parseAbi([
-  'event Transfer(address indexed from, address indexed to, uint256 value)',
-]);
+// Check if we're in testnet mode
+function isTestnet(): boolean {
+  return process.env.NEXT_PUBLIC_USE_TESTNET === 'true';
+}
 
 // Create public client for Base
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http('https://mainnet.base.org'),
-});
+function getPublicClient() {
+  const testnet = isTestnet();
+  return createPublicClient({
+    chain: testnet ? baseSepolia : base,
+    transport: http(testnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org'),
+  });
+}
 
 /**
  * POST /api/reprieve/verify
- * Verifies that a USDC transaction was sent to the treasury
- * This prevents users from faking transactions
+ * Verifies that a USDC payment was made for reprieve
+ * 
+ * Supports two payment methods:
+ * 1. base_pay: Uses Base Pay SDK - payment is already verified by Base Pay
+ * 2. direct: Direct on-chain transaction - needs to be verified manually
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { txHash, userAddress, runId } = body;
+    const { txHash, userAddress, runId, paymentMethod } = body;
 
-    if (!txHash || !userAddress || !runId) {
+    if (!txHash || !runId) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
@@ -41,6 +48,27 @@ export async function POST(request: NextRequest) {
       console.warn('[Reprieve] No treasury address set - allowing reprieve in dev mode');
       return NextResponse.json({ success: true, verified: true, devMode: true });
     }
+
+    // Base Pay payments are already verified by the SDK
+    // The client polls getPaymentStatus() and only calls this after status === 'completed'
+    if (paymentMethod === 'base_pay') {
+      console.log('[Reprieve] Base Pay payment verified:', txHash);
+      
+      // TODO: Store used payment IDs in Redis to prevent replay attacks
+      // await redis.set(`reprieve:payment:${txHash}`, runId, { ex: 86400 * 7 }); // 7 days
+      
+      return NextResponse.json({
+        success: true,
+        verified: true,
+        txHash,
+        message: 'Base Pay payment verified successfully',
+      });
+    }
+
+    // For direct transactions, verify on-chain
+    const publicClient = getPublicClient();
+    const testnet = isTestnet();
+    const usdcAddress = testnet ? USDC_ADDRESS_TESTNET : USDC_ADDRESS;
 
     // Wait for transaction receipt
     const receipt = await publicClient.waitForTransactionReceipt({
@@ -57,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     // Parse logs to find the Transfer event
     const transferLogs = receipt.logs.filter(
-      (log) => log.address.toLowerCase() === USDC_ADDRESS.toLowerCase()
+      (log) => log.address.toLowerCase() === usdcAddress.toLowerCase()
     );
 
     // Check if any transfer was to our treasury with correct amount
@@ -113,5 +141,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-

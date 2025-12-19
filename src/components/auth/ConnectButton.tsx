@@ -1,6 +1,6 @@
 'use client';
 
-import { usePrivy } from '@privy-io/react-auth';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ConnectButtonProps {
   className?: string;
@@ -8,7 +8,7 @@ interface ConnectButtonProps {
 }
 
 export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProps) {
-  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { isReady, isAuthenticated, isLoading, user, login, logout } = useAuth();
   
   const sizeClasses = {
     sm: 'py-2 px-4 text-sm',
@@ -16,8 +16,8 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
     lg: 'py-4 px-8 text-lg',
   };
   
-  // Show loading state while Privy initializes
-  if (!ready) {
+  // Show loading state while initializing
+  if (!isReady || isLoading) {
     return (
       <button
         disabled
@@ -29,16 +29,16 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
           ${className}
         `}
       >
-        Loading...
+        {isLoading ? 'Signing in...' : 'Loading...'}
       </button>
     );
   }
   
-  // User is connected - show their info and logout option
-  if (authenticated && user) {
-    const displayAddress = user.wallet?.address 
-      ? `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}`
-      : 'Connected';
+  // User is authenticated - show their info and logout option
+  if (isAuthenticated && user) {
+    const displayName = user.username 
+      ? `@${user.username}` 
+      : user.displayName || `FID: ${user.fid}`;
     
     return (
       <button
@@ -53,12 +53,12 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
           ${className}
         `}
       >
-        {displayAddress}
+        {displayName}
       </button>
     );
   }
   
-  // Not connected - show connect button
+  // Not authenticated - show sign in button
   return (
     <button
       onClick={login}
@@ -73,33 +73,7 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
         ${className}
       `}
     >
-      Connect Wallet
+      Sign In with Farcaster
     </button>
   );
 }
-
-// Simpler version for when Privy is not configured
-export function GuestPlayButton({ 
-  onClick, 
-  className = '' 
-}: { 
-  onClick: () => void; 
-  className?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        py-2 px-4 text-sm
-        text-zinc-400 hover:text-white
-        underline underline-offset-4
-        transition-colors
-        ${className}
-      `}
-    >
-      or play as guest
-    </button>
-  );
-}
-
-

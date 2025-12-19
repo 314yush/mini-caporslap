@@ -16,9 +16,9 @@ import { UserMenu } from '@/components/auth/UserMenu';
 
 export function GameScreen() {
   const { user, isLoading: identityLoading } = useIdentity();
-  const { isAuthenticated, address, isGuest } = useAuth();
-  // Use wallet address if connected, otherwise use identity userId (for guests)
-  const userId = (!isGuest && address) ? address : (user?.userId || '');
+  const { fid } = useAuth();
+  // Use FID as the user identifier
+  const userId = fid ? String(fid) : (user?.userId || '');
   const {
     gameState,
     isLoading,
@@ -130,7 +130,6 @@ export function GameScreen() {
         lossExplanation={lossExplanation}
         onPlayAgain={playAgain}
         onReprieveComplete={handleReprieveComplete}
-        isWalletConnected={isAuthenticated}
       />
     );
   }

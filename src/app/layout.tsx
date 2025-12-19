@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
-import { PrivyProvider } from '@/components/providers/PrivyProvider';
 import { MiniAppProvider } from '@/components/providers/MiniAppProvider';
 import './globals.css';
 
@@ -68,7 +67,7 @@ export default function RootLayout({
         className={`${spaceGrotesk.variable} font-sans antialiased bg-zinc-950 text-white`}
       >
         <MiniAppProvider>
-          <PrivyProvider>{children}</PrivyProvider>
+          {children}
         </MiniAppProvider>
         <Analytics />
         <SpeedInsights />

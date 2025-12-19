@@ -5,9 +5,9 @@ import { GameScreen } from '@/components/game';
 import { LandingPage } from '@/components/landing';
 
 export default function Home() {
-  const { isReady, isAuthenticated, playAsGuest } = useAuth();
+  const { isReady, isAuthenticated, login, isLoading } = useAuth();
   
-  // Show loading while Privy initializes
+  // Show loading while initializing
   if (!isReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950">
@@ -21,9 +21,9 @@ export default function Home() {
   
   // Show landing page if not authenticated
   if (!isAuthenticated) {
-    return <LandingPage onPlayAsGuest={playAsGuest} />;
+    return <LandingPage onLogin={login} isLoading={isLoading} />;
   }
   
-  // Show game if authenticated (wallet or guest)
+  // Show game if authenticated
   return <GameScreen />;
 }
