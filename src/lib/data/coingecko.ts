@@ -1,5 +1,6 @@
 import { Token, TokenCategory } from '../game-core/types';
 import { findTokenInfoById, getAllCuratedIds } from './token-categories';
+import { trackCoinGeckoFetch, trackCoinGeckoRateLimit } from '../analytics';
 
 /**
  * CoinGecko API client for fetching token market data
@@ -116,6 +117,67 @@ export async function fetchTopCoinsByMarketCap(limit: number = 100): Promise<Tok
     return data.map((coin) => coinToToken(coin));
   } catch (error) {
     console.error('[CoinGecko] Error fetching top coins:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches top 500 tokens by market cap from CoinGecko
+ * This is the primary source for the expanded token pool
+ * Automatically enriched with curated metadata where available
+ */
+export async function fetchTop500Tokens(): Promise<Token[]> {
+  const startTime = Date.now();
+  try {
+    // CoinGecko allows up to 250 per page, so we need 2 pages for 500 tokens
+    const [page1, page2] = await Promise.all([
+      fetch(
+        `${BASE_URL}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false`,
+        {
+          headers: { 'Accept': 'application/json' },
+          next: { revalidate: 300 }, // 5 minutes cache
+        }
+      ),
+      fetch(
+        `${BASE_URL}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=2&sparkline=false`,
+        {
+          headers: { 'Accept': 'application/json' },
+          next: { revalidate: 300 },
+        }
+      ),
+    ]);
+
+    if (!page1.ok) {
+      if (page1.status === 429) {
+        console.warn('[CoinGecko] Rate limited on top 500 fetch');
+        trackCoinGeckoRateLimit('top_500');
+        trackCoinGeckoFetch('top_500', 0, Date.now() - startTime, false, 'Rate limited');
+        return [];
+      }
+      throw new Error(`CoinGecko API error: ${page1.status}`);
+    }
+
+    const data1: CoinGeckoCoin[] = await page1.json();
+    const data2: CoinGeckoCoin[] = page2.ok ? await page2.json() : [];
+    
+    console.log(`[CoinGecko] Page 1: ${data1.length} tokens, Page 2: ${data2.length} tokens`);
+    
+    const allCoins = [...data1, ...data2];
+    const duration = Date.now() - startTime;
+    console.log(`[CoinGecko] Fetched ${allCoins.length} top tokens (target: 500) in ${duration}ms`);
+
+    // Convert to tokens - coinToToken automatically enriches with curated metadata
+    const tokens = allCoins.map((coin) => coinToToken(coin));
+    
+    // Track successful fetch
+    trackCoinGeckoFetch('top_500', tokens.length, duration, true);
+    
+    return tokens;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[CoinGecko] Error fetching top 500 tokens:', error);
+    trackCoinGeckoFetch('top_500', 0, duration, false, errorMessage);
     return [];
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { getSharePreview } from '@/lib/social/sharing';
+import { trackSocialShare, trackShareInSession } from '@/lib/analytics';
 
 interface ShareButtonProps {
   streak: number;
@@ -20,6 +21,10 @@ export function ShareButton({ streak, className = '', children }: ShareButtonPro
     setSharing(true);
     const shareText = getSharePreview(streak);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mini.caporslap.fun';
+    
+    // Track share analytics
+    trackSocialShare('farcaster', streak, 'loss');
+    trackShareInSession();
     
     try {
       // Try to use Base's composeCast via Farcaster SDK

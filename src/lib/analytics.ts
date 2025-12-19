@@ -4,19 +4,30 @@
  */
 
 import { track } from '@vercel/analytics';
+import { track as trackServer } from '@vercel/analytics/server';
 
 /**
  * Track game start event
+ * Enhanced with timing and context
  */
-export function trackGameStart(runId: string, userId: string) {
+export function trackGameStart(
+  runId: string, 
+  userId: string,
+  timeSinceLastGame?: number, // milliseconds since last game
+  isRetry?: boolean
+) {
   track('game_start', {
     runId,
     userId: userId.slice(0, 8), // Truncate for privacy
+    timeSinceLastGame: timeSinceLastGame ? Math.round(timeSinceLastGame) : undefined,
+    isRetry: isRetry ?? false,
+    timestamp: Date.now(),
   });
 }
 
 /**
  * Track guess event (correct or incorrect)
+ * Enhanced with timing and difficulty context
  */
 export function trackGuess(
   runId: string,
@@ -24,7 +35,10 @@ export function trackGuess(
   correct: boolean,
   streak: number,
   currentToken: string,
-  nextToken: string
+  nextToken: string,
+  timeToGuess?: number, // milliseconds from token display to guess
+  difficulty?: string,
+  marketCapRatio?: number // ratio between tokens
 ) {
   track('game_guess', {
     runId,
@@ -33,6 +47,10 @@ export function trackGuess(
     streak,
     currentToken,
     nextToken,
+    timeToGuess: timeToGuess ? Math.round(timeToGuess) : undefined,
+    difficulty,
+    marketCapRatio: marketCapRatio ? Math.round(marketCapRatio * 100) / 100 : undefined,
+    timestamp: Date.now(),
   });
 }
 
@@ -53,18 +71,27 @@ export function trackStreakMilestone(streak: number, runId: string) {
 
 /**
  * Track game loss/end
+ * Enhanced with timing and session context
  */
 export function trackGameLoss(
   runId: string,
   finalStreak: number,
   usedReprieve: boolean,
-  lastToken: string
+  lastToken: string,
+  gameDuration?: number, // milliseconds
+  totalGuesses?: number,
+  accuracy?: number // percentage
 ) {
   track('game_loss', {
     runId,
     finalStreak,
     usedReprieve,
     lastToken,
+    gameDuration: gameDuration ? Math.round(gameDuration) : undefined,
+    gameDurationSeconds: gameDuration ? Math.round(gameDuration / 1000) : undefined,
+    totalGuesses,
+    accuracy,
+    timestamp: Date.now(),
   });
 }
 
@@ -125,4 +152,64 @@ export function trackLeaderboardSubmit(streak: number, rank?: number) {
     streak,
     rank,
   });
+}
+
+/**
+ * Track CoinGecko API calls and performance
+ * Uses server-side tracking for API routes
+ */
+export function trackCoinGeckoFetch(
+  endpoint: string,
+  tokenCount: number,
+  duration: number,
+  success: boolean,
+  error?: string
+) {
+  try {
+    trackServer('coingecko_fetch', {
+      endpoint,
+      tokenCount,
+      duration: Math.round(duration), // Round to nearest ms
+      success,
+      error: error ? error.slice(0, 50) : undefined,
+    });
+  } catch (err) {
+    // Silently fail analytics - don't break the flow
+    console.warn('[Analytics] Failed to track coingecko_fetch:', err);
+  }
+}
+
+/**
+ * Track CoinGecko rate limit hit
+ * Uses server-side tracking for API routes
+ */
+export function trackCoinGeckoRateLimit(endpoint: string) {
+  try {
+    trackServer('coingecko_rate_limit', {
+      endpoint,
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    console.warn('[Analytics] Failed to track coingecko_rate_limit:', err);
+  }
+}
+
+/**
+ * Track token pool refresh
+ * Uses server-side tracking for API routes
+ */
+export function trackTokenPoolRefresh(
+  tokenCount: number,
+  source: 'coingecko' | 'dexscreener' | 'fallback',
+  duration: number
+) {
+  try {
+    trackServer('token_pool_refresh', {
+      tokenCount,
+      source,
+      duration: Math.round(duration),
+    });
+  } catch (err) {
+    console.warn('[Analytics] Failed to track token_pool_refresh:', err);
+  }
 }

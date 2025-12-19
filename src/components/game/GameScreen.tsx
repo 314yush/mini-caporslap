@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useGame, useIdentity, useGameTimer, useAuth } from '@/hooks';
@@ -12,6 +12,12 @@ import { TokenInfoTooltip } from './TokenInfoTooltip';
 import { GameTimer } from './GameTimer';
 import { LiveOvertakeQueue } from './LiveOvertakeToast';
 import { UserMenu } from '@/components/auth/UserMenu';
+import { 
+  initSessionTracking, 
+  trackGameStartInSession,
+  trackPageView 
+} from '@/lib/analytics/session';
+import { trackJourneyStep } from '@/lib/analytics/engagement';
 
 export function GameScreen() {
   const { user, isLoading: identityLoading } = useIdentity();
@@ -19,8 +25,24 @@ export function GameScreen() {
   // Use FID as the user identifier
   const userId = fid ? String(fid) : (user?.userId || '');
   
+  // Track token display time for guess timing
+  const [tokenDisplayTime, setTokenDisplayTime] = useState<number | null>(null);
+  const gameStartTimeRef = useRef<number | null>(null);
+  const lastGameEndTimeRef = useRef<number | null>(null);
+  const sessionStartTimeRef = useRef<number | null>(null);
+  
   // Debug logging
   console.log('[GameScreen] Rendering with:', { fid, userId, identityLoading });
+  
+  // Initialize session tracking
+  useEffect(() => {
+    if (userId && !sessionStartTimeRef.current) {
+      sessionStartTimeRef.current = Date.now();
+      initSessionTracking(userId);
+      trackPageView('game');
+      trackJourneyStep('landing_view', 0);
+    }
+  }, [userId]);
   
   const {
     gameState,
@@ -37,6 +59,55 @@ export function GameScreen() {
     clearLiveOvertakes,
   } = useGame(userId);
   
+  // Track token display time for guess timing analytics
+  useEffect(() => {
+    if (gameState.nextToken && gameState.phase === 'playing') {
+      setTokenDisplayTime(Date.now());
+    }
+  }, [gameState.nextToken, gameState.phase]);
+
+  // Track game start
+  useEffect(() => {
+    if (gameState.runId && gameState.phase === 'playing' && !gameStartTimeRef.current) {
+      gameStartTimeRef.current = Date.now();
+      const timeSinceLastGame = lastGameEndTimeRef.current 
+        ? gameStartTimeRef.current - lastGameEndTimeRef.current 
+        : undefined;
+      
+      trackGameStartInSession();
+      if (sessionStartTimeRef.current) {
+        trackJourneyStep('game_start', gameStartTimeRef.current ? Date.now() - sessionStartTimeRef.current : 0);
+      }
+    }
+  }, [gameState.runId, gameState.phase]);
+
+  // Track first guess
+  useEffect(() => {
+    if (gameState.streak === 1 && sessionStartTimeRef.current) {
+      trackJourneyStep('first_guess', Date.now() - sessionStartTimeRef.current);
+    }
+  }, [gameState.streak]);
+
+  // Track milestone streaks
+  useEffect(() => {
+    if (gameState.streak === 5 && sessionStartTimeRef.current) {
+      trackJourneyStep('streak_5', Date.now() - sessionStartTimeRef.current, gameState.streak);
+    }
+    if (gameState.streak === 10 && sessionStartTimeRef.current) {
+      trackJourneyStep('streak_10', Date.now() - sessionStartTimeRef.current, gameState.streak);
+    }
+  }, [gameState.streak]);
+
+  // Track game loss
+  useEffect(() => {
+    if (gameState.phase === 'loss' && gameStartTimeRef.current) {
+      lastGameEndTimeRef.current = Date.now();
+      if (sessionStartTimeRef.current) {
+        trackJourneyStep('loss', Date.now() - sessionStartTimeRef.current, gameState.streak);
+      }
+    }
+  }, [gameState.phase, gameState.streak]);
+
   // Debug: Log game state changes
   useEffect(() => {
     console.log('[GameScreen] Game state:', {

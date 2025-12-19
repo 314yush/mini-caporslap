@@ -9,7 +9,7 @@ A fast, social, skill-based crypto market cap guessing game. Compare two tokens,
 ## ✨ Features
 
 - **🎯 Instant Play**: No login, no wallet required - just play
-- **📊 80+ Tokens**: Curated across L1, L2, memecoins, DeFi, AI, RWA categories
+- **📊 500+ Tokens**: Top tokens by market cap, enriched with curated metadata
 - **📈 Real-time Data**: Token prices from CoinGecko API (15-min cache)
 - **🏆 Global Leaderboards**: Weekly and all-time rankings
 - **📤 Social Sharing**: Challenge friends with shareable links
@@ -118,7 +118,7 @@ src/
 
 ### Phase 0 ✅ Web MVP
 - [x] Core gameplay with split-screen UI
-- [x] 80+ curated tokens
+- [x] 500+ tokens (top by market cap, enriched with curated metadata)
 - [x] Anonymous users (localStorage UUID)
 - [x] Global leaderboard
 - [x] Token info tooltips

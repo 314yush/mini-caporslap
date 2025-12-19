@@ -7,6 +7,7 @@ import { generateShareData, generateShareText, shareToClipboard, getSharePreview
 import { miniAppComposeCast } from '@/lib/farcaster/sdk';
 import { canOfferReprieve, getReprieveCopy, isReprieveFree } from '@/lib/game-core/reprieve';
 import { useReprievePayment, PaymentStatus } from '@/hooks/useReprievePayment';
+import { trackSocialShare, trackShareInSession, trackReprieveDecision, trackDropOff } from '@/lib/analytics';
 
 interface LossScreenProps {
   run: Run;
@@ -36,6 +37,16 @@ export function LossScreen({
   const [showActions, setShowActions] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const lossScreenStartTime = useState(() => Date.now())[0];
+  const reprieveDecisionStartTime = useState(() => Date.now())[0];
+  
+  // Track drop-off on loss screen
+  useEffect(() => {
+    return () => {
+      const timeOnScreen = Date.now() - lossScreenStartTime;
+      trackDropOff('loss_screen', timeOnScreen, run.streak);
+    };
+  }, [lossScreenStartTime, run.streak]);
   
   // Payment hook
   const { 
@@ -59,17 +70,27 @@ export function LossScreen({
   // When payment succeeds, trigger reprieve continuation
   useEffect(() => {
     if (paymentStatus === 'success') {
+      const paymentTime = Date.now() - reprieveDecisionStartTime;
+      trackReprieveDecision('completed', run.streak, paymentTime, paymentTime);
+      
       // Small delay to show success message
       const timer = setTimeout(() => {
         onReprieveComplete();
         resetPayment();
       }, 1000);
       return () => clearTimeout(timer);
+    } else if (paymentStatus === 'error') {
+      trackReprieveDecision('failed', run.streak, Date.now() - reprieveDecisionStartTime);
     }
-  }, [paymentStatus, onReprieveComplete, resetPayment]);
+  }, [paymentStatus, onReprieveComplete, resetPayment, run.streak, reprieveDecisionStartTime]);
 
   const handleShare = async () => {
     setSharing(true);
+    
+    // Track share analytics
+    trackSocialShare('farcaster', run.streak, 'loss');
+    trackShareInSession();
+    
     const shareData = generateShareData(run);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mini.caporslap.fun';
     
@@ -98,11 +119,15 @@ export function LossScreen({
 
   // Handle paid reprieve
   const handlePaidReprieve = async () => {
+    const timeToDecide = Date.now() - reprieveDecisionStartTime;
+    trackReprieveDecision('initiated', run.streak, timeToDecide);
     await payForReprieve(run.runId);
   };
 
   // Handle free reprieve (testing mode)
   const handleFreeReprieve = () => {
+    const timeToDecide = Date.now() - reprieveDecisionStartTime;
+    trackReprieveDecision('completed', run.streak, timeToDecide);
     onReprieveComplete();
   };
 

@@ -43,7 +43,7 @@ export const DIFFICULTY_TIERS: DifficultyTier[] = [
     maxStreak: 14, 
     minMcapRatio: 1.5,  // At least 1.5x difference
     maxMcapRatio: 4,    // Up to 4x difference
-    tokenPoolSize: 80   // Top 80 tokens
+    tokenPoolSize: 200   // Top 200 tokens
   },
   { 
     name: 'Expert',  
@@ -51,7 +51,7 @@ export const DIFFICULTY_TIERS: DifficultyTier[] = [
     maxStreak: 19, 
     minMcapRatio: 1.2,  // At least 1.2x difference
     maxMcapRatio: 2.5,  // Up to 2.5x difference
-    tokenPoolSize: 100  // All tokens
+    tokenPoolSize: 350  // Top 350 tokens
   },
   { 
     name: 'Insane',  
@@ -59,7 +59,7 @@ export const DIFFICULTY_TIERS: DifficultyTier[] = [
     maxStreak: 999, 
     minMcapRatio: 1.1,  // Very close - at least 1.1x difference
     maxMcapRatio: 1.8,  // Up to 1.8x difference
-    tokenPoolSize: 100  // All tokens
+    tokenPoolSize: 500  // All tokens
   },
 ];
 

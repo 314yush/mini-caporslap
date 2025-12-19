@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { LeaderboardList } from '@/components/leaderboard';
 import { LeaderboardEntry } from '@/lib/game-core/types';
 import { useIdentity } from '@/hooks';
+import { trackPageView, trackLeaderboardEngagement, trackJourneyStep } from '@/lib/analytics';
 
 type LeaderboardType = 'weekly' | 'global';
 
@@ -14,6 +15,18 @@ export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const pageStartTime = useRef<number>(Date.now());
+  
+  // Track page view and journey step
+  useEffect(() => {
+    trackPageView('leaderboard');
+    trackJourneyStep('leaderboard_view', 0);
+    
+    return () => {
+      const timeOnPage = Date.now() - pageStartTime.current;
+      trackLeaderboardEngagement('view', timeOnPage, userRank || undefined);
+    };
+  }, [userRank]);
 
   useEffect(() => {
     async function fetchLeaderboard() {
@@ -61,7 +74,10 @@ export default function LeaderboardPage() {
           {/* Type tabs */}
           <div className="flex gap-2 mt-4">
             <button
-              onClick={() => setType('weekly')}
+              onClick={() => {
+                setType('weekly');
+                trackLeaderboardEngagement('filter', Date.now() - pageStartTime.current);
+              }}
               className={`
                 flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors
                 ${type === 'weekly' 
@@ -73,7 +89,10 @@ export default function LeaderboardPage() {
               This Week
             </button>
             <button
-              onClick={() => setType('global')}
+              onClick={() => {
+                setType('global');
+                trackLeaderboardEngagement('filter', Date.now() - pageStartTime.current);
+              }}
               className={`
                 flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors
                 ${type === 'global' 

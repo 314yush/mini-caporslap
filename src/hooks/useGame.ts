@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { 
   GameState, 
   Guess, 
@@ -11,8 +11,19 @@ import {
 import { compareMarketCaps, generateLossExplanation } from '@/lib/game-core/comparison';
 import { getReprieveState } from '@/lib/game-core/reprieve';
 import { getStreakTier, getStreakMilestoneMessage } from '@/lib/game-core/streak';
+import { getTierName } from '@/lib/game-core/difficulty';
 import { OvertakeEvent } from '@/lib/leaderboard/overtake';
 import { LiveOvertakeData } from '@/components/game/LiveOvertakeToast';
+import { 
+  trackGuess, 
+  trackGameLoss, 
+  trackStreakMilestone,
+  trackGuessInSession,
+  trackRetry,
+  trackGameStart,
+  getCurrentSession,
+  trackGuessTiming
+} from '@/lib/analytics';
 
 interface UseGameReturn {
   // State
@@ -61,6 +72,11 @@ export function useGame(userId: string): UseGameReturn {
   const [completedRun, setCompletedRun] = useState<Run | null>(null);
   const [overtakes, setOvertakes] = useState<OvertakeEvent[]>([]);
   const [liveOvertakes, setLiveOvertakes] = useState<LiveOvertakeData[]>([]);
+  
+  // Analytics tracking refs
+  const gameStartTimeRef = useRef<number | null>(null);
+  const lastGameEndTimeRef = useRef<number | null>(null);
+  const tokenDisplayTimeRef = useRef<number | null>(null);
 
   // Check for live overtakes after streak increases
   const checkLiveOvertakes = useCallback(async (newStreak: number, previousStreak: number) => {
@@ -123,6 +139,10 @@ export function useGame(userId: string): UseGameReturn {
         preloadedCount: data.preloadedTokens?.length || 0,
       });
       
+      const now = Date.now();
+      gameStartTimeRef.current = now;
+      tokenDisplayTimeRef.current = now;
+      
       setGameState({
         phase: 'playing',
         currentToken: data.currentToken,
@@ -132,6 +152,12 @@ export function useGame(userId: string): UseGameReturn {
         runId: data.runId,
         preloadedTokens: data.preloadedTokens || [],
       });
+      
+      // Track game start
+      const timeSinceLastGame = lastGameEndTimeRef.current 
+        ? now - lastGameEndTimeRef.current 
+        : undefined;
+      trackGameStart(data.runId, userId, timeSinceLastGame, !!lastGameEndTimeRef.current);
     } catch (err) {
       console.error('[useGame] startGame error:', err);
       setError(err instanceof Error ? err.message : 'Failed to start game');
@@ -145,6 +171,16 @@ export function useGame(userId: string): UseGameReturn {
     if (!gameState.currentToken || !gameState.nextToken) return;
     if (gameState.phase !== 'playing') return;
     
+    // Calculate timing and context for analytics
+    const timeToGuess = tokenDisplayTimeRef.current 
+      ? Date.now() - tokenDisplayTimeRef.current 
+      : undefined;
+    const difficulty = getTierName(gameState.streak);
+    const marketCapRatio = gameState.currentToken.marketCap > 0 && gameState.nextToken.marketCap > 0
+      ? Math.max(gameState.currentToken.marketCap, gameState.nextToken.marketCap) / 
+        Math.min(gameState.currentToken.marketCap, gameState.nextToken.marketCap)
+      : undefined;
+    
     // Compare market caps
     const result = compareMarketCaps(
       gameState.currentToken,
@@ -154,9 +190,31 @@ export function useGame(userId: string): UseGameReturn {
     
     setLastResult(result);
     
+    // Track guess with analytics
+    trackGuess(
+      gameState.runId,
+      guess,
+      result.correct,
+      gameState.streak,
+      gameState.currentToken.symbol,
+      gameState.nextToken.symbol,
+      timeToGuess,
+      difficulty,
+      marketCapRatio
+    );
+    trackGuessInSession(result.correct, gameState.streak);
+    
+    // Track guess timing separately for detailed analysis
+    if (timeToGuess !== undefined) {
+      trackGuessTiming(timeToGuess, gameState.streak, difficulty, result.correct);
+    }
+    
     if (result.correct) {
       const newStreak = gameState.streak + 1;
       const previousStreak = gameState.streak;
+      
+      // Track streak milestones
+      trackStreakMilestone(newStreak, gameState.runId);
       
       // Correct guess - show animation, then continue
       setGameState(prev => ({
@@ -184,6 +242,28 @@ export function useGame(userId: string): UseGameReturn {
         ...prev,
         phase: 'loss',
       }));
+      
+      // Track game loss with analytics
+      const gameDuration = gameStartTimeRef.current 
+        ? Date.now() - gameStartTimeRef.current 
+        : undefined;
+      const session = getCurrentSession();
+      const totalGuesses = session?.totalGuesses || 0;
+      const accuracy = totalGuesses > 0 && session
+        ? (session.correctGuesses / totalGuesses) * 100
+        : undefined;
+      
+      trackGameLoss(
+        gameState.runId,
+        gameState.streak,
+        gameState.hasUsedReprieve,
+        gameState.currentToken.symbol,
+        gameDuration,
+        totalGuesses,
+        accuracy
+      );
+      
+      lastGameEndTimeRef.current = Date.now();
       
       // Submit to leaderboard and capture overtakes
       fetch('/api/leaderboard/submit', {
@@ -247,6 +327,16 @@ export function useGame(userId: string): UseGameReturn {
         nextToken: nextPreloaded,
         preloadedTokens: remainingPreloaded,
       }));
+      
+      // Update token display time for next guess timing
+      tokenDisplayTimeRef.current = Date.now();
+      
+      // Track play time in session
+      if (gameStartTimeRef.current) {
+        const playTimeSeconds = Math.round((Date.now() - gameStartTimeRef.current) / 1000);
+        const { trackPlayTime } = await import('@/lib/analytics');
+        trackPlayTime(playTimeSeconds);
+      }
       
       // If we're running low on preloaded tokens, fetch more in background
       if (remainingPreloaded.length <= 2) {
@@ -370,6 +460,17 @@ export function useGame(userId: string): UseGameReturn {
 
   // Play again (start fresh)
   const playAgain = useCallback(() => {
+    // Track retry analytics
+    const previousStreak = gameState.streak;
+    const timeSinceLoss = lastGameEndTimeRef.current 
+      ? Date.now() - lastGameEndTimeRef.current 
+      : 0;
+    const timeBetweenGames = lastGameEndTimeRef.current && gameStartTimeRef.current
+      ? Date.now() - lastGameEndTimeRef.current
+      : 0;
+    
+    trackRetry(previousStreak, timeSinceLoss, timeBetweenGames);
+    
     // Reset to initial state, then start new game
     setGameState({
       ...initialGameState,
@@ -379,7 +480,9 @@ export function useGame(userId: string): UseGameReturn {
     setCompletedRun(null);
     setOvertakes([]);
     setLiveOvertakes([]);
-  }, []);
+    gameStartTimeRef.current = null;
+    tokenDisplayTimeRef.current = null;
+  }, [gameState.streak]);
 
   // Auto-start game on mount or after playAgain
   useEffect(() => {

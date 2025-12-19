@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks';
 import { GameScreen } from '@/components/game';
 import { LandingPage, OnboardingModal } from '@/components/landing';
+import { initSessionTracking, trackPageView, trackJourneyStep } from '@/lib/analytics';
 
 const ONBOARDING_SEEN_KEY = 'caporslap_onboarding_seen';
 
@@ -12,6 +13,15 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   
+  // Initialize analytics session tracking
+  useEffect(() => {
+    if (isReady && fid) {
+      const userId = String(fid);
+      initSessionTracking(userId);
+      trackPageView('home');
+    }
+  }, [isReady, fid]);
+
   // Debug logging for auth state changes
   useEffect(() => {
     console.log('[Page] Auth state changed:', {
@@ -58,6 +68,14 @@ export default function Home() {
     );
   }
   
+  // Track landing page view
+  useEffect(() => {
+    if (!isAuthenticated) {
+      trackPageView('landing');
+      trackJourneyStep('landing_view', 0);
+    }
+  }, [isAuthenticated]);
+
   // Show landing page if not authenticated
   if (!isAuthenticated) {
     console.log('[Page] Rendering: Landing page (isAuthenticated=false)');

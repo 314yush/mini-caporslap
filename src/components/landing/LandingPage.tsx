@@ -145,7 +145,7 @@ export function LandingPage({ onLogin, isLoading = false }: LandingPageProps) {
         {/* Minimal Features */}
         <div className="w-full mb-8 md:mb-12">
           <p className="text-xs md:text-sm text-zinc-500 text-center">
-            80+ tokens • Infinite streaks • Global leaderboard
+            500+ tokens • Infinite streaks • Global leaderboard
           </p>
         </div>
       </div>

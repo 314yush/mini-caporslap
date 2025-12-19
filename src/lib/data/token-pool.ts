@@ -1,7 +1,8 @@
 import { Token } from '../game-core/types';
-import { fetchCuratedTokens, fetchTrendingCoins, testCoinGeckoAPI } from './coingecko';
+import { fetchCuratedTokens, fetchTop500Tokens, fetchTrendingCoins, testCoinGeckoAPI } from './coingecko';
 import { fetchTopTokens, fetchTrendingTokens, testDexScreenerAPI } from './dexscreener';
 import { CURATED_TOKENS, findTokenInfoBySymbol } from './token-categories';
+import { trackTokenPoolRefresh } from '../analytics';
 
 /**
  * Token pool management with aggressive caching
@@ -22,46 +23,52 @@ const dataSourceStatus = {
 
 /**
  * Gets the token pool, using cached data when available
- * Primary source: CoinGecko (curated list)
+ * Primary source: CoinGecko (top 500 by market cap, enriched with curated metadata)
  * Secondary source: DexScreener (for trending/new tokens)
  */
 export async function getTokenPool(): Promise<Token[]> {
   const now = Date.now();
   
   // Return cached tokens if still valid
-  if (cachedTokens.length >= MIN_TOKENS_REQUIRED && now - lastFetchTime < CACHE_DURATION) {
+  // Only use cache if we have a reasonable number of tokens (at least 100 for expanded pool)
+  if (cachedTokens.length >= 100 && now - lastFetchTime < CACHE_DURATION) {
     return cachedTokens;
   }
 
   console.log('[TokenPool] Refreshing token pool...');
+  const refreshStartTime = Date.now();
 
   try {
     const tokenMap = new Map<string, Token>();
+    let primarySource: 'coingecko' | 'dexscreener' | 'fallback' = 'fallback';
 
-    // PRIMARY: Fetch curated tokens from CoinGecko
+    // PRIMARY: Fetch top 500 tokens from CoinGecko
+    // These are automatically enriched with curated metadata via coinToToken()
     if (dataSourceStatus.coingecko.available) {
       try {
-        const curatedTokens = await fetchCuratedTokens();
-        console.log(`[TokenPool] CoinGecko curated: ${curatedTokens.length} tokens`);
+        const top500Tokens = await fetchTop500Tokens();
+        console.log(`[TokenPool] CoinGecko top 500: ${top500Tokens.length} tokens`);
+        primarySource = 'coingecko';
         
-        for (const token of curatedTokens) {
+        for (const token of top500Tokens) {
           if (token.marketCap > 0) {
-            tokenMap.set(token.symbol.toUpperCase(), token);
+            // Use token ID as key for deduplication (more reliable than symbol)
+            // coinToToken() already enriches with curated metadata if available
+            tokenMap.set(token.id, token);
           }
         }
 
-        // Also fetch trending for variety
+        // Also fetch trending for variety (in case new tokens aren't in top 500 yet)
         const trending = await fetchTrendingCoins();
         for (const token of trending) {
-          const key = token.symbol.toUpperCase();
-          if (!tokenMap.has(key) && token.marketCap > 1_000_000) {
+          if (!tokenMap.has(token.id) && token.marketCap > 1_000_000) {
             // Enrich with curated info if available
             const info = findTokenInfoBySymbol(token.symbol);
             if (info) {
               token.category = info.category;
               token.description = info.description;
             }
-            tokenMap.set(key, token);
+            tokenMap.set(token.id, token);
           }
         }
         
@@ -83,22 +90,20 @@ export async function getTokenPool(): Promise<Token[]> {
         console.log(`[TokenPool] DexScreener: ${dsTokens.length} tokens`);
         
         for (const token of dsTokens) {
-          const key = token.symbol.toUpperCase();
-          if (!tokenMap.has(key) && token.marketCap > 1_000_000) {
+          if (!tokenMap.has(token.id) && token.marketCap > 1_000_000) {
             const info = findTokenInfoBySymbol(token.symbol);
             if (info) {
               token.category = info.category;
               token.description = info.description;
             }
-            tokenMap.set(key, token);
+            tokenMap.set(token.id, token);
           }
         }
 
         const dsTrending = await fetchTrendingTokens();
         for (const token of dsTrending) {
-          const key = token.symbol.toUpperCase();
-          if (!tokenMap.has(key) && token.marketCap > 1_000_000) {
-            tokenMap.set(key, token);
+          if (!tokenMap.has(token.id) && token.marketCap > 1_000_000) {
+            tokenMap.set(token.id, token);
           }
         }
         
@@ -130,9 +135,8 @@ export async function getTokenPool(): Promise<Token[]> {
       console.warn('[TokenPool] Adding fallback tokens');
       const fallbacks = getFallbackTokens();
       for (const token of fallbacks) {
-        const key = token.symbol.toUpperCase();
-        if (!tokenMap.has(key)) {
-          tokenMap.set(key, token);
+        if (!tokenMap.has(token.id)) {
+          tokenMap.set(token.id, token);
         }
       }
       allTokens = Array.from(tokenMap.values());
@@ -144,7 +148,12 @@ export async function getTokenPool(): Promise<Token[]> {
     cachedTokens = allTokens;
     lastFetchTime = now;
     
-    console.log(`[TokenPool] Final pool: ${cachedTokens.length} tokens`);
+    const refreshDuration = Date.now() - refreshStartTime;
+    console.log(`[TokenPool] Final pool: ${cachedTokens.length} tokens (${refreshDuration}ms)`);
+    
+    // Track token pool refresh
+    trackTokenPoolRefresh(cachedTokens.length, primarySource, refreshDuration);
+    
     return cachedTokens;
   } catch (error) {
     console.error('[TokenPool] Critical error:', error);
