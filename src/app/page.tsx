@@ -26,9 +26,12 @@ export default function Home() {
   // Check if user has seen onboarding after authentication
   useEffect(() => {
     if (isReady && isAuthenticated && !onboardingChecked) {
-      const hasSeenOnboarding = localStorage.getItem(ONBOARDING_SEEN_KEY) === 'true';
-      setShowOnboarding(!hasSeenOnboarding);
-      setOnboardingChecked(true);
+      // Defer state updates to avoid synchronous setState in effect
+      queueMicrotask(() => {
+        const hasSeenOnboarding = localStorage.getItem(ONBOARDING_SEEN_KEY) === 'true';
+        setShowOnboarding(!hasSeenOnboarding);
+        setOnboardingChecked(true);
+      });
     }
   }, [isReady, isAuthenticated, onboardingChecked]);
 
