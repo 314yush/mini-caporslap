@@ -3,7 +3,6 @@ import { Space_Grotesk } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { MiniAppProvider } from '@/components/providers/MiniAppProvider';
-import { ConsoleLogger } from '@/components/debug';
 import { PostHogProvider } from '@/components/analytics/PostHogProvider';
 import './globals.css';
 
