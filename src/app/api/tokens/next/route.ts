@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTokenPool } from '@/lib/data/token-pool';
 import { selectNextToken } from '@/lib/game-core/sequencing';
-import { getTierName } from '@/lib/game-core/difficulty';
 import { Token } from '@/lib/game-core/types';
 
 /**
  * POST /api/tokens/next
- * Gets the next token for comparison with difficulty-aware selection
+ * Gets the next token for comparison
  */
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +13,6 @@ export async function POST(request: NextRequest) {
     const { 
       currentTokenId, 
       recentTokenIds = [],
-      streak = 0,  // Current streak for difficulty calculation
     } = body;
 
     // Get token pool
@@ -27,16 +25,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find current token for difficulty-aware selection
+    // Find current token
     const currentToken = tokens.find((t: Token) => t.id === currentTokenId) || null;
 
-    // Select next token with difficulty awareness
-    const nextToken = selectNextToken(tokens, currentToken, recentTokenIds, streak);
+    // Select next token (ensuring it's different from current)
+    const nextToken = selectNextToken(tokens, currentToken, recentTokenIds);
 
     return NextResponse.json({
       success: true,
       nextToken,
-      difficulty: getTierName(streak),
     });
   } catch (error) {
     console.error('Error getting next token:', error);

@@ -1,88 +1,65 @@
 import { Token } from './types';
-import { 
-  selectNextTokenByDifficulty, 
-  selectInitialPairByDifficulty,
-  getTierForStreak 
-} from './difficulty';
 
 /**
- * Selects the next token to show, with optional difficulty scaling
+ * Check if two tokens are truly different (by ID, symbol, and name)
+ * This prevents showing the same token with different IDs or similar tokens
+ */
+function areTokensDifferent(a: Token, b: Token): boolean {
+  if (a.id === b.id) return false;
+  if (a.symbol.toUpperCase() === b.symbol.toUpperCase()) return false;
+  if (a.name.toLowerCase() === b.name.toLowerCase()) return false;
+  // Also check for similar logos (same URL = likely same token)
+  if (a.logoUrl === b.logoUrl) return false;
+  return true;
+}
+
+/**
+ * Selects the next token to show
+ * Simple random selection with strong uniqueness guarantees
  * @param tokens - Pool of available tokens
- * @param currentToken - Current token (needed for difficulty calculation)
- * @param recentTokenIds - IDs of recently shown tokens to avoid
- * @param streak - Current streak for difficulty scaling (optional)
+ * @param currentToken - Current token to avoid
+ * @param recentTokenIds - IDs of recently shown tokens to deprioritize
  * @returns Selected next token
  */
 export function selectNextToken(
   tokens: Token[],
   currentToken: Token | null,
   recentTokenIds: string[] = [],
-  streak: number = 0
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _streak: number = 0 // Kept for API compatibility but not used
 ): Token {
-  // If we have a current token and streak info, use difficulty-aware selection
-  if (currentToken && tokens.length > 0) {
-    const selected = selectNextTokenByDifficulty(
-      tokens,
-      currentToken,
-      streak,
-      recentTokenIds
-    );
-    
-    if (selected) {
-      return selected;
-    }
+  if (tokens.length === 0) {
+    throw new Error('No tokens available');
   }
-  
-  // Fallback to simple selection if difficulty selection fails
-  return selectNextTokenSimple(tokens, currentToken?.id || null, recentTokenIds);
-}
 
-/**
- * Simple token selection (legacy, no difficulty)
- * Uses weighted random selection to ensure variety
- * @param tokens - Pool of available tokens
- * @param currentTokenId - ID of current token to avoid
- * @param recentTokenIds - IDs of recently shown tokens to deprioritize
- * @returns Selected next token
- */
-export function selectNextTokenSimple(
-  tokens: Token[],
-  currentTokenId: string | null,
-  recentTokenIds: string[] = []
-): Token {
-  // Filter out current token
-  const availableTokens = tokens.filter((t) => t.id !== currentTokenId);
+  // Filter out current token and any tokens that might be duplicates
+  const availableTokens = tokens.filter((t) => {
+    // Must be different from current token
+    if (currentToken && !areTokensDifferent(t, currentToken)) {
+      return false;
+    }
+    return true;
+  });
 
   if (availableTokens.length === 0) {
     throw new Error('No available tokens to select');
   }
 
-  // Assign weights - lower weight to recently shown tokens
-  const weights = availableTokens.map((token) => {
-    const recentIndex = recentTokenIds.indexOf(token.id);
-    if (recentIndex === -1) return 1.0; // Not recent, full weight
-    // More recent = lower weight
-    return 0.2 + (recentIndex / recentTokenIds.length) * 0.6;
-  });
+  // Create a list of candidates, excluding recent tokens when possible
+  const recentSet = new Set(recentTokenIds);
+  const freshTokens = availableTokens.filter((t) => !recentSet.has(t.id));
+  
+  // Prefer fresh tokens, but fall back to all available if needed
+  const candidates = freshTokens.length > 0 ? freshTokens : availableTokens;
 
-  // Weighted random selection
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  let random = Math.random() * totalWeight;
-
-  for (let i = 0; i < availableTokens.length; i++) {
-    random -= weights[i];
-    if (random <= 0) {
-      return availableTokens[i];
-    }
-  }
-
-  // Fallback to last token
-  return availableTokens[availableTokens.length - 1];
+  // Simple random selection
+  const randomIndex = Math.floor(Math.random() * candidates.length);
+  return candidates[randomIndex];
 }
 
 /**
  * Selects an initial pair of tokens to start the game
- * Uses difficulty system for appropriate market cap spread
+ * Ensures tokens are meaningfully different
  * @param tokens - Pool of available tokens
  * @returns Tuple of [currentToken, nextToken]
  */
@@ -91,44 +68,28 @@ export function selectInitialPair(tokens: Token[]): [Token, Token] {
     throw new Error('Need at least 2 tokens to start game');
   }
 
-  // Try difficulty-aware selection first
-  const difficultyPair = selectInitialPairByDifficulty(tokens);
-  if (difficultyPair) {
-    return [difficultyPair.currentToken, difficultyPair.nextToken];
+  // Shuffle the tokens for randomness
+  const shuffled = shuffleTokens([...tokens]);
+  
+  // Pick first token
+  const current = shuffled[0];
+  
+  // Find a different token
+  let next: Token | null = null;
+  for (let i = 1; i < shuffled.length; i++) {
+    if (areTokensDifferent(current, shuffled[i])) {
+      next = shuffled[i];
+      break;
+    }
+  }
+  
+  // If somehow we couldn't find a different token, use the second one anyway
+  if (!next) {
+    next = shuffled[1];
+    console.warn('[selectInitialPair] Could not find truly different token, using fallback');
   }
 
-  // Fallback to simple selection
-  return selectInitialPairSimple(tokens);
-}
-
-/**
- * Simple initial pair selection (legacy, no difficulty)
- * Picks tokens with different market caps for contrast
- * @param tokens - Pool of available tokens
- * @returns Tuple of [currentToken, nextToken]
- */
-export function selectInitialPairSimple(tokens: Token[]): [Token, Token] {
-  if (tokens.length < 2) {
-    throw new Error('Need at least 2 tokens to start game');
-  }
-
-  // Sort by market cap
-  const sorted = [...tokens].sort((a, b) => b.marketCap - a.marketCap);
-
-  // Pick one from top third and one from bottom third for contrast
-  const topThird = sorted.slice(0, Math.ceil(sorted.length / 3));
-  const bottomThird = sorted.slice(-Math.ceil(sorted.length / 3));
-
-  const current = topThird[Math.floor(Math.random() * topThird.length)];
-  let next = bottomThird[Math.floor(Math.random() * bottomThird.length)];
-
-  // Ensure they're different
-  if (next.id === current.id) {
-    next = bottomThird.find((t) => t.id !== current.id) || sorted[sorted.length - 1];
-  }
-
-  // Randomly swap order
-  return Math.random() > 0.5 ? [current, next] : [next, current];
+  return [current, next];
 }
 
 /**
@@ -159,5 +120,12 @@ export function shuffleTokens<T>(array: T[]): T[] {
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
+}
+
+/**
+ * Check if two tokens are the same (for external use)
+ */
+export function areTokensSame(a: Token, b: Token): boolean {
+  return !areTokensDifferent(a, b);
 }
 

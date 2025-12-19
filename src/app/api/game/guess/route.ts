@@ -6,7 +6,6 @@ import { checkRateLimit, GameGuess } from '@/lib/game-core/validator';
 import { Guess, Token } from '@/lib/game-core/types';
 import { getRedis } from '@/lib/redis';
 import { selectNextToken } from '@/lib/game-core/sequencing';
-import { getTierName } from '@/lib/game-core/difficulty';
 
 interface GuessRouteGameState {
   runId: string;
@@ -22,7 +21,6 @@ interface GuessRouteGameState {
   roundNumber: number;
   tokenPoolIds: string[];
   lastGuessTimestamp?: number;
-  difficultyTier?: string;  // Track current difficulty tier
 }
 
 /**
@@ -149,16 +147,12 @@ export async function POST(request: NextRequest) {
         // Update state for next round
         state.currentTokenId = nextTokenId;
         
-        // Update difficulty tier
-        state.difficultyTier = getTierName(newStreak);
-        
-        // Pre-select next token server-side with difficulty awareness
-        // Use difficulty-aware selection for better gameplay
-        const nextNextToken = selectNextToken(tokens, nextToken, usedTokenIds, newStreak);
+        // Pre-select next token server-side
+        const nextNextToken = selectNextToken(tokens, nextToken, usedTokenIds);
         if (nextNextToken) {
           state.nextTokenId = nextNextToken.id;
         } else {
-          // Fallback to seeded selection if difficulty selection fails
+          // Fallback to seeded selection if selection fails
           const seededToken = selectNextTokenSeeded(tokens, state.seed, state.roundNumber, usedTokenIds);
           if (seededToken) {
             state.nextTokenId = seededToken.id;
@@ -179,10 +173,10 @@ export async function POST(request: NextRequest) {
 
     // Prepare response
     if (isCorrect) {
-      // Select next token with difficulty awareness
-      let nextNextToken: Token | null = selectNextToken(tokens, nextToken, usedTokenIds, newStreak);
+      // Select next token
+      let nextNextToken: Token | null = selectNextToken(tokens, nextToken, usedTokenIds);
       
-      // Fallback to seeded selection if difficulty selection returns null
+      // Fallback to seeded selection if selection returns null
       if (!nextNextToken) {
         nextNextToken = selectNextTokenSeeded(
           tokens, 
@@ -198,7 +192,6 @@ export async function POST(request: NextRequest) {
       }
       
       const newTimerDuration = getTimerDuration(newStreak);
-      const difficulty = getTierName(newStreak);
       
       return NextResponse.json({
         success: true,
@@ -208,7 +201,6 @@ export async function POST(request: NextRequest) {
         nextToken: nextNextToken,
         revealedMarketCap: nextToken.marketCap,
         timerDuration: newTimerDuration,
-        difficulty,
       });
     } else {
       // Game over
@@ -220,7 +212,6 @@ export async function POST(request: NextRequest) {
         nextToken,
         revealedMarketCap: nextToken.marketCap,
         correctAnswer: nextToken.marketCap >= currentToken.marketCap ? 'cap' : 'slap',
-        difficulty: getTierName(newStreak),
       });
     }
   } catch (error) {

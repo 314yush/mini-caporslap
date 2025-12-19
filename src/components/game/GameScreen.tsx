@@ -11,7 +11,6 @@ import { LossScreen } from './LossScreen';
 import { TokenInfoTooltip } from './TokenInfoTooltip';
 import { GameTimer } from './GameTimer';
 import { LiveOvertakeQueue } from './LiveOvertakeToast';
-import { DifficultyBadge } from './DifficultyBadge';
 import { UserMenu } from '@/components/auth/UserMenu';
 
 export function GameScreen() {
@@ -264,19 +263,13 @@ function SplitScreenGame({
         </div>
       </div>
 
-      {/* Top bar with streak, difficulty, and user menu */}
+      {/* Top bar with streak and user menu */}
       <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
-        {/* Left side: Streak + Difficulty */}
+        {/* Left side: Streak counter */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Streak counter */}
           <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5">
             <span className="text-amber-400 text-lg">🔥</span>
             <span className="text-white font-bold text-lg tabular-nums">{streak}</span>
-          </div>
-          
-          {/* Difficulty badge */}
-          <div className="bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
-            <DifficultyBadge streak={streak} size="sm" />
           </div>
         </div>
 

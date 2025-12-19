@@ -7,7 +7,6 @@ import {
 } from '@/lib/game-core/seeded-selection';
 import { selectInitialPair } from '@/lib/game-core/sequencing';
 import { getTimerDuration } from '@/lib/game-core/timer';
-import { getTierName } from '@/lib/game-core/difficulty';
 import { getRedis } from '@/lib/redis';
 
 /**
@@ -41,12 +40,12 @@ export async function POST(request: NextRequest) {
     const runId = uuidv4();
     const seed = generateGameSeed();
 
-    // Select initial pair using difficulty-aware selection
+    // Select initial pair
     let currentToken, nextToken;
     try {
       [currentToken, nextToken] = selectInitialPair(tokens);
     } catch {
-      // Fallback to seeded selection if difficulty selection fails
+      // Fallback to seeded selection if selection fails
       const pair = selectInitialPairSeeded(tokens, seed);
       if (!pair) {
         return NextResponse.json(
@@ -60,7 +59,6 @@ export async function POST(request: NextRequest) {
 
     const startedAt = Date.now();
     const timerDuration = getTimerDuration(0);
-    const difficulty = getTierName(0); // Initial difficulty is Easy
 
     // Store game state in Redis for validation
     const redis = getRedis();
@@ -76,7 +74,6 @@ export async function POST(request: NextRequest) {
         currentTokenId: currentToken.id,
         nextTokenId: nextToken.id,
         roundNumber: 0,
-        difficultyTier: difficulty,
         // Store token IDs for this game session
         tokenPoolIds: tokens.map(t => t.id),
       };
@@ -94,7 +91,6 @@ export async function POST(request: NextRequest) {
       nextToken,
       timerDuration,
       startedAt,
-      difficulty,
     });
   } catch (error) {
     console.error('Error starting game:', error);
