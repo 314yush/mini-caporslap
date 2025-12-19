@@ -117,8 +117,9 @@ You can:
 
 ## Quick Access Links
 
-- **Vercel Dashboard**: https://vercel.com/dashboard
-- **Analytics Documentation**: https://vercel.com/docs/analytics
+- **PostHog Dashboard**: https://app.posthog.com (Recommended - Free!)
+- **PostHog Docs**: https://posthog.com/docs
+- **Vercel Dashboard**: https://vercel.com/dashboard (Pro plan only for custom events)
 
 ## What to Look For
 

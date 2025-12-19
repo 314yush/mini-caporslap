@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { detectEnvironment } from '@/lib/environment';
+import { useAuthDev } from './useAuthDev';
 
 export interface FarcasterUser {
   fid: number;
@@ -37,12 +39,34 @@ export function useAuth(): AuthState {
   const [user, setUser] = useState<FarcasterUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
+  // Check if we're in development mode (not in Base App)
+  const isDevelopment = typeof window !== 'undefined' && detectEnvironment() === 'web';
+  const devAuth = useAuthDev();
+
   // Check for existing session on mount
   useEffect(() => {
     console.log('[useAuth] Checking for existing session...');
+    console.log('[useAuth] Environment:', isDevelopment ? 'development (web)' : 'production (Base App)');
     
     const checkExistingSession = async () => {
       try {
+        // In development mode, use dev auth
+        if (isDevelopment) {
+          if (devAuth.isConnected && devAuth.fid && devAuth.user) {
+            console.log('[useAuth] Using dev auth session, FID:', devAuth.fid);
+            setFid(devAuth.fid);
+            setUser(devAuth.user);
+            setIsAuthenticated(true);
+            // Dev mode doesn't use tokens
+            setToken('dev_token');
+          } else {
+            console.log('[useAuth] No dev auth session found');
+          }
+          setIsReady(true);
+          return;
+        }
+
+        // Production mode: check for Quick Auth token
         const storedToken = sessionStorage.getItem(AUTH_TOKEN_KEY);
         const storedUser = sessionStorage.getItem(AUTH_USER_KEY);
         
@@ -71,14 +95,33 @@ export function useAuth(): AuthState {
     };
 
     checkExistingSession();
-  }, []);
+  }, [isDevelopment, devAuth.isConnected, devAuth.fid, devAuth.user]);
 
-  // Login using Quick Auth
+  // Login using Quick Auth (production) or Wallet (development)
   const login = useCallback(async () => {
     console.log('[useAuth] Login started...');
     setIsLoading(true);
     
     try {
+      // Development mode: use wallet connection
+      if (isDevelopment) {
+        console.log('[useAuth] Using development mode (wallet connection)');
+        await devAuth.connect();
+        
+        if (devAuth.fid && devAuth.user) {
+          setFid(devAuth.fid);
+          setUser(devAuth.user);
+          setToken('dev_token');
+          setIsAuthenticated(true);
+          console.log('[useAuth] Dev authentication successful! FID:', devAuth.fid);
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Production mode: use Quick Auth
+      console.log('[useAuth] Using production mode (Quick Auth)');
+      
       // Dynamically import the SDK to avoid SSR issues
       console.log('[useAuth] Importing Farcaster SDK...');
       const { sdk } = await import('@farcaster/miniapp-sdk');
@@ -156,7 +199,7 @@ export function useAuth(): AuthState {
       console.log('[useAuth] Login complete, setting isLoading=false');
       setIsLoading(false);
     }
-  }, []);
+  }, [isDevelopment, devAuth]);
 
   // Logout
   const logout = useCallback(() => {
@@ -169,8 +212,13 @@ export function useAuth(): AuthState {
     sessionStorage.removeItem(AUTH_TOKEN_KEY);
     sessionStorage.removeItem(AUTH_USER_KEY);
     
+    // Also clear dev auth if in development
+    if (isDevelopment) {
+      devAuth.disconnect();
+    }
+    
     console.log('[useAuth] Logged out');
-  }, []);
+  }, [isDevelopment, devAuth]);
 
   return {
     isReady,

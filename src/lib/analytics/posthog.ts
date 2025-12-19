@@ -20,28 +20,43 @@ export function initPostHog() {
   const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
 
   if (!posthogKey) {
-    console.warn('[PostHog] NEXT_PUBLIC_POSTHOG_KEY not set, analytics disabled');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[PostHog] NEXT_PUBLIC_POSTHOG_KEY not set, analytics disabled');
+    }
     return;
   }
 
-  posthog.init(posthogKey, {
-    api_host: posthogHost,
-    loaded: (posthog) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[PostHog] Initialized');
-      }
-    },
-    // Privacy settings
-    capture_pageview: false, // We'll track pageviews manually
-    capture_pageleave: true,
-    // Session replay (optional, uses quota)
-    session_recording: {
-      maskAllInputs: true, // Privacy: mask all inputs
-      maskTextSelector: '.text-mask', // Custom class for masking
-    },
-  });
+  try {
+    posthog.init(posthogKey, {
+      api_host: posthogHost,
+      loaded: (ph) => {
+        isInitialized = true;
+        // Expose PostHog on window for debugging (optional)
+        if (typeof window !== 'undefined') {
+          (window as any).posthog = ph;
+        }
+      },
+      // Privacy settings
+      capture_pageview: false, // We'll track pageviews manually
+      capture_pageleave: true,
+      // Session replay (optional, uses quota)
+      session_recording: {
+        maskAllInputs: true, // Privacy: mask all inputs
+        maskTextSelector: '.text-mask', // Custom class for masking
+      },
+    });
 
-  isInitialized = true;
+    // Expose the posthog instance on window
+    if (typeof window !== 'undefined' && posthog) {
+      (window as any).posthog = posthog;
+    }
+
+    // Set flag immediately (PostHog initializes asynchronously)
+    isInitialized = true;
+  } catch (error) {
+    console.error('[PostHog] Initialization failed:', error);
+    isInitialized = false;
+  }
 }
 
 /**
@@ -50,10 +65,7 @@ export function initPostHog() {
  */
 export function trackPostHog(event: string, properties?: Record<string, unknown>) {
   if (typeof window === 'undefined') return;
-  if (!isInitialized) {
-    console.warn('[PostHog] Not initialized, call initPostHog() first');
-    return;
-  }
+  if (!isInitialized) return;
 
   posthog.capture(event, properties);
 }
@@ -95,5 +107,7 @@ export function resetPostHog() {
  * Check if PostHog is available
  */
 export function isPostHogReady(): boolean {
-  return isInitialized && typeof window !== 'undefined';
+  if (typeof window === 'undefined') return false;
+  // Check both our flag and PostHog's actual presence
+  return isInitialized && (!!posthog || !!(window as any).posthog);
 }

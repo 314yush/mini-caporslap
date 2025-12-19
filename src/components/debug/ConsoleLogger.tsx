@@ -153,14 +153,13 @@ export function ConsoleLogger({ maxLogs = 100, enabled = true }: ConsoleLoggerPr
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-4 right-4 z-[9999] bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-2 rounded-lg text-xs font-mono shadow-lg border border-zinc-700 flex items-center gap-2"
+          className="fixed bottom-3 right-3 z-[9999] bg-zinc-900/60 hover:bg-zinc-800/80 backdrop-blur-sm text-zinc-400 hover:text-zinc-300 w-8 h-8 rounded-full text-xs flex items-center justify-center transition-all opacity-60 hover:opacity-100"
           title="Open Debug Console"
         >
-          <span>🐛</span>
-          <span>Console</span>
+          <span className="text-[14px]">🐛</span>
           {logs.length > 0 && (
-            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-              {logs.length}
+            <span className="absolute -top-1 -right-1 bg-rose-500/80 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
+              {logs.length > 9 ? '9+' : logs.length}
             </span>
           )}
         </button>

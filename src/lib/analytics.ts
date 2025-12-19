@@ -31,7 +31,7 @@ const trackEvent = (event: string, properties?: Record<string, unknown>) => {
     } else {
       track(event);
     }
-  } catch (err) {
+  } catch {
     // Silently fail if Vercel Analytics doesn't support custom events (free tier)
   }
 };

@@ -59,6 +59,10 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
   }
   
   // Not authenticated - show sign in button
+  const isDevelopment = typeof window !== 'undefined' && 
+    !window.location.href.includes('base.org') && 
+    !window.location.href.includes('farcaster.xyz');
+  
   return (
     <button
       onClick={login}
@@ -73,7 +77,7 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
         ${className}
       `}
     >
-      Sign In with Farcaster
+      {isDevelopment ? 'Connect Wallet (Dev)' : 'Sign In with Farcaster'}
     </button>
   );
 }
