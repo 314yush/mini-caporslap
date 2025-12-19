@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { getSharePreview } from '@/lib/social/sharing';
-import { trackSocialShare, trackShareInSession } from '@/lib/analytics';
+import { trackSocialShare } from '@/lib/analytics/engagement';
+import { trackShareInSession } from '@/lib/analytics/session';
 
 interface ShareButtonProps {
   streak: number;

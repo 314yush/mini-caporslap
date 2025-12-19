@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks';
 import { GameScreen } from '@/components/game';
 import { LandingPage, OnboardingModal } from '@/components/landing';
-import { initSessionTracking, trackPageView, trackJourneyStep } from '@/lib/analytics';
+import { initSessionTracking, trackPageView } from '@/lib/analytics/session';
+import { trackJourneyStep } from '@/lib/analytics/engagement';
 
 const ONBOARDING_SEEN_KEY = 'caporslap_onboarding_seen';
 
@@ -45,6 +46,14 @@ export default function Home() {
     }
   }, [isReady, isAuthenticated, onboardingChecked]);
 
+  // Track landing page view (must be before conditional returns)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      trackPageView('landing');
+      trackJourneyStep('landing_view', 0);
+    }
+  }, [isAuthenticated]);
+
   const handleOnboardingComplete = () => {
     localStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
     setShowOnboarding(false);
@@ -67,14 +76,6 @@ export default function Home() {
       </div>
     );
   }
-  
-  // Track landing page view
-  useEffect(() => {
-    if (!isAuthenticated) {
-      trackPageView('landing');
-      trackJourneyStep('landing_view', 0);
-    }
-  }, [isAuthenticated]);
 
   // Show landing page if not authenticated
   if (!isAuthenticated) {

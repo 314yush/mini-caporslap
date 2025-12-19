@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useGame, useIdentity, useGameTimer, useAuth } from '@/hooks';
@@ -25,8 +25,8 @@ export function GameScreen() {
   // Use FID as the user identifier
   const userId = fid ? String(fid) : (user?.userId || '');
   
-  // Track token display time for guess timing
-  const [tokenDisplayTime, setTokenDisplayTime] = useState<number | null>(null);
+  // Track token display time for guess timing (using ref to avoid setState in effect)
+  const tokenDisplayTimeRef = useRef<number | null>(null);
   const gameStartTimeRef = useRef<number | null>(null);
   const lastGameEndTimeRef = useRef<number | null>(null);
   const sessionStartTimeRef = useRef<number | null>(null);
@@ -59,10 +59,11 @@ export function GameScreen() {
     clearLiveOvertakes,
   } = useGame(userId);
   
-  // Track token display time for guess timing analytics
+  // Track token display time for guess timing analytics (using ref, not state)
   useEffect(() => {
     if (gameState.nextToken && gameState.phase === 'playing') {
-      setTokenDisplayTime(Date.now());
+      // Use ref instead of setState to avoid React warning
+      tokenDisplayTimeRef.current = Date.now();
     }
   }, [gameState.nextToken, gameState.phase]);
 
@@ -70,9 +71,6 @@ export function GameScreen() {
   useEffect(() => {
     if (gameState.runId && gameState.phase === 'playing' && !gameStartTimeRef.current) {
       gameStartTimeRef.current = Date.now();
-      const timeSinceLastGame = lastGameEndTimeRef.current 
-        ? gameStartTimeRef.current - lastGameEndTimeRef.current 
-        : undefined;
       
       trackGameStartInSession();
       if (sessionStartTimeRef.current) {

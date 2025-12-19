@@ -7,7 +7,9 @@ import { generateShareData, generateShareText, shareToClipboard, getSharePreview
 import { miniAppComposeCast } from '@/lib/farcaster/sdk';
 import { canOfferReprieve, getReprieveCopy, isReprieveFree } from '@/lib/game-core/reprieve';
 import { useReprievePayment, PaymentStatus } from '@/hooks/useReprievePayment';
-import { trackSocialShare, trackShareInSession, trackReprieveDecision, trackDropOff } from '@/lib/analytics';
+import { trackSocialShare } from '@/lib/analytics/engagement';
+import { trackShareInSession } from '@/lib/analytics/session';
+import { trackReprieveDecision, trackDropOff } from '@/lib/analytics/engagement';
 
 interface LossScreenProps {
   run: Run;

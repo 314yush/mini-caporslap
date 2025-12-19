@@ -23,7 +23,6 @@ export interface SessionData {
 // In-memory session storage (client-side only)
 let currentSession: SessionData | null = null;
 let sessionStartTime: number | null = null;
-let lastActivityTime: number | null = null;
 let activityTimer: NodeJS.Timeout | null = null;
 
 /**
@@ -49,7 +48,6 @@ export function startSession(userId: string): string {
   };
   
   sessionStartTime = now;
-  lastActivityTime = now;
   
   // Track session start
   track('session_start', {
@@ -99,7 +97,6 @@ export function endSession() {
   stopActivityTracking();
   currentSession = null;
   sessionStartTime = null;
-  lastActivityTime = null;
 }
 
 /**
@@ -117,7 +114,6 @@ export function updateActivity() {
   
   const now = Date.now();
   currentSession.lastActivity = now;
-  lastActivityTime = now;
   
   // Reset activity timer
   if (activityTimer) {

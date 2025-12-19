@@ -11,7 +11,7 @@ import { track } from '@vercel/analytics';
 export function trackActionTiming(
   action: string,
   timeSinceLastAction: number, // in milliseconds
-  context?: Record<string, any>
+  context?: Record<string, string | number | boolean>
 ) {
   track('action_timing', {
     action,

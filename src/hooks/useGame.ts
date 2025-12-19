@@ -18,12 +18,16 @@ import {
   trackGuess, 
   trackGameLoss, 
   trackStreakMilestone,
-  trackGuessInSession,
-  trackRetry,
   trackGameStart,
-  getCurrentSession,
-  trackGuessTiming
 } from '@/lib/analytics';
+import {
+  trackGuessInSession,
+  getCurrentSession,
+} from '@/lib/analytics/session';
+import {
+  trackRetry,
+  trackGuessTiming,
+} from '@/lib/analytics/engagement';
 
 interface UseGameReturn {
   // State
@@ -334,7 +338,7 @@ export function useGame(userId: string): UseGameReturn {
       // Track play time in session
       if (gameStartTimeRef.current) {
         const playTimeSeconds = Math.round((Date.now() - gameStartTimeRef.current) / 1000);
-        const { trackPlayTime } = await import('@/lib/analytics');
+        const { trackPlayTime } = await import('@/lib/analytics/session');
         trackPlayTime(playTimeSeconds);
       }
       

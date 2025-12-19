@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { LeaderboardList } from '@/components/leaderboard';
 import { LeaderboardEntry } from '@/lib/game-core/types';
 import { useIdentity } from '@/hooks';
-import { trackPageView, trackLeaderboardEngagement, trackJourneyStep } from '@/lib/analytics';
+import { trackPageView } from '@/lib/analytics/session';
+import { trackLeaderboardEngagement, trackJourneyStep } from '@/lib/analytics/engagement';
 
 type LeaderboardType = 'weekly' | 'global';
 
