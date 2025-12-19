@@ -39,7 +39,7 @@ export async function GET() {
       version: '1',
       name: 'CapOrSlap',
       homeUrl: appUrl,
-      iconUrl: `${appUrl}/images/miniapp/icon-512.png`,
+      iconUrl: `${appUrl}/android-chrome-512x512.png`,
       
       // Required: Loading Experience
       splashImageUrl: `${appUrl}/images/miniapp/splash-1200.png`,
