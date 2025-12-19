@@ -69,6 +69,9 @@ export async function GET() {
       
       // Optional: Search indexing (false = include in search)
       noindex: false,
+      
+      // Notifications webhook endpoint
+      webhookUrl: `${appUrl}/api/webhook`,
     }),
   };
 

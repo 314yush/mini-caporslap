@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@base-org/account": "^2.5.1",
+    "@farcaster/miniapp-node": "^0.1.11",
     "@farcaster/miniapp-sdk": "^0.2.1",
     "@farcaster/quick-auth": "^0.0.8",
     "@solana-program/system": "^0.10.0",
