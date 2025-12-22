@@ -96,7 +96,7 @@ export async function getCurrentPrizePool(): Promise<PrizePoolConfig | null> {
       };
     }
     
-    return typeof configJson === 'string' ? JSON.parse(configJson) : configJson;
+    return typeof configJson === 'string' ? JSON.parse(configJson) as PrizePoolConfig : configJson as PrizePoolConfig;
   } catch (error) {
     console.error('Error fetching prize pool config:', error);
     return null;
@@ -152,7 +152,7 @@ export async function getSponsor(): Promise<SponsorInfo | null> {
     
     if (!sponsorJson) return null;
     
-    return typeof sponsorJson === 'string' ? JSON.parse(sponsorJson) : sponsorJson;
+    return typeof sponsorJson === 'string' ? JSON.parse(sponsorJson) as SponsorInfo : sponsorJson as SponsorInfo;
   } catch (error) {
     console.error('Error fetching sponsor:', error);
     return null;
