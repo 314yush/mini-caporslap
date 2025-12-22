@@ -312,6 +312,11 @@ export async function trackWeeklyScore(userId: string, streak: number): Promise<
   const client = getRedis();
   if (!client) return 0;
   
+  // Reject guest users - they should not be tracked
+  if (userId.startsWith('guest_')) {
+    return 0;
+  }
+  
   try {
     const weekKey = getWeekKey();
     const statsKey = KEYS.userWeeklyStats(userId);

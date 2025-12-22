@@ -90,9 +90,6 @@ export function PrizePoolBanner({
         <div className="flex items-center justify-center gap-2 mb-2">
           <span className="text-lg animate-spin" style={{ animationDuration: '2s' }}>⏱️</span>
           <span className="text-violet-200/90 text-xs font-medium">Ends in:</span>
-          {isPulsing && (
-            <span className="text-xs text-amber-400 animate-pulse font-semibold">⚡</span>
-          )}
         </div>
         
         <div className="flex justify-center overflow-x-auto">

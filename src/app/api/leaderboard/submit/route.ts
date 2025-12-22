@@ -23,6 +23,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reject guest users - they should not be able to submit to leaderboard
+    if (userId.startsWith('guest_')) {
+      return NextResponse.json(
+        { success: false, error: 'Guest users cannot submit to leaderboard' },
+        { status: 403 }
+      );
+    }
+
     const redis = getRedis();
     
     // For high scores, validate against server state

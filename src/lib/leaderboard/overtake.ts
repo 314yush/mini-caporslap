@@ -165,6 +165,17 @@ export async function submitScoreWithOvertakes(
   streak: number,
   userIdentity: ResolvedIdentity
 ): Promise<LeaderboardSubmitResult> {
+  // Reject guest users - they should not be added to leaderboard
+  if (userId.startsWith('guest_')) {
+    return {
+      success: false,
+      isNewBest: false,
+      previousRank: null,
+      newRank: 0,
+      overtakes: [],
+    };
+  }
+  
   const globalKey = KEYS.globalLeaderboard;
   const weeklyKey = KEYS.weeklyLeaderboard();
   
