@@ -153,7 +153,7 @@ export function trackLeaderboardEngagement(
 export function trackSocialShare(
   platform: 'twitter' | 'farcaster' | 'copy_link' | 'other',
   streak: number,
-  shareContext: 'loss' | 'milestone' | 'leaderboard'
+  shareContext: 'loss' | 'milestone' | 'leaderboard' | 'win'
 ) {
   trackEngagementEvent('social_share', {
     platform,
