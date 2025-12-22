@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Run } from '@/lib/game-core/types';
 import { formatMarketCap } from '@/lib/game-core/comparison';
-import { generateShareData, generateShareText, shareToClipboard, getSharePreview } from '@/lib/social/sharing';
+import { generateShareData, generateShareText, shareToClipboard } from '@/lib/social/sharing';
 import { miniAppComposeCast } from '@/lib/farcaster/sdk';
-import { canOfferReprieve, getReprieveCopy, isReprieveFree } from '@/lib/game-core/reprieve';
+import { canOfferReprieve, getReprieveState, getReprieveCopy, isReprieveFree } from '@/lib/game-core/reprieve';
 import { useReprievePayment, PaymentStatus } from '@/hooks/useReprievePayment';
 import { trackSocialShare } from '@/lib/analytics/engagement';
 import { trackShareInSession } from '@/lib/analytics/session';
@@ -39,8 +39,14 @@ export function LossScreen({
   const [showActions, setShowActions] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [reprieveState, setReprieveState] = useState<Awaited<ReturnType<typeof getReprieveState>> | null>(null);
   const lossScreenStartTime = useState(() => Date.now())[0];
   const reprieveDecisionStartTime = useState(() => Date.now())[0];
+  
+  // Fetch reprieve state
+  useEffect(() => {
+    getReprieveState(run.streak, run.usedReprieve, 0).then(setReprieveState);
+  }, [run.streak, run.usedReprieve]);
   
   // Track drop-off on loss screen
   useEffect(() => {
@@ -134,7 +140,7 @@ export function LossScreen({
   };
 
   const showReprieve = canOfferReprieve(run.streak, run.usedReprieve);
-  const reprieveCopy = showReprieve ? getReprieveCopy(run.streak) : null;
+  const reprieveCopy = showReprieve && reprieveState ? getReprieveCopy(run.streak, reprieveState) : null;
   const isFree = isReprieveFree();
   
   // All users are authenticated, so paid reprieve is always available (unless free mode)
@@ -353,11 +359,6 @@ export function LossScreen({
             </p>
           </div>
         )}
-
-        {/* Share preview */}
-        <div className="text-center text-xs text-zinc-600 mt-2">
-          <p>{getSharePreview(run.streak)}</p>
-        </div>
       </div>
     </div>
   );

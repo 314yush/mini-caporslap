@@ -6,6 +6,7 @@ import { checkRateLimit, GameGuess } from '@/lib/game-core/validator';
 import { Guess, Token } from '@/lib/game-core/types';
 import { getRedis } from '@/lib/redis';
 import { selectNextToken } from '@/lib/game-core/sequencing';
+import { selectNextTokenByDifficulty } from '@/lib/game-core/difficulty';
 
 interface GuessRouteGameState {
   runId: string;
@@ -148,7 +149,18 @@ export async function POST(request: NextRequest) {
         state.currentTokenId = nextTokenId;
         
         // Pre-select next token server-side
-        const nextNextToken = selectNextToken(tokens, nextToken, usedTokenIds);
+        // Use difficulty-based selection which prioritizes famous tokens for streaks 0-4
+        let nextNextToken: Token | null = null;
+        if (newStreak <= 4) {
+          // For streaks 0-4, use difficulty-based selection (prioritizes famous tokens)
+          nextNextToken = selectNextTokenByDifficulty(tokens, nextToken, newStreak, usedTokenIds);
+        }
+        
+        // Fallback to regular selection if difficulty-based didn't work
+        if (!nextNextToken) {
+          nextNextToken = selectNextToken(tokens, nextToken, usedTokenIds);
+        }
+        
         if (nextNextToken) {
           state.nextTokenId = nextNextToken.id;
         } else {
@@ -174,7 +186,17 @@ export async function POST(request: NextRequest) {
     // Prepare response
     if (isCorrect) {
       // Select next token
-      let nextNextToken: Token | null = selectNextToken(tokens, nextToken, usedTokenIds);
+      // Use difficulty-based selection which prioritizes famous tokens for streaks 0-4
+      let nextNextToken: Token | null = null;
+      if (newStreak <= 4) {
+        // For streaks 0-4, use difficulty-based selection (prioritizes famous tokens)
+        nextNextToken = selectNextTokenByDifficulty(tokens, nextToken, newStreak, usedTokenIds);
+      }
+      
+      // Fallback to regular selection if difficulty-based didn't work
+      if (!nextNextToken) {
+        nextNextToken = selectNextToken(tokens, nextToken, usedTokenIds);
+      }
       
       // Fallback to seeded selection if selection returns null
       if (!nextNextToken) {

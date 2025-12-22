@@ -5,7 +5,8 @@ import {
   generateGameSeed, 
   selectInitialPairSeeded
 } from '@/lib/game-core/seeded-selection';
-import { selectInitialPair, selectNextToken } from '@/lib/game-core/sequencing';
+import { selectInitialPair, selectNextToken, selectFamousTokenPair } from '@/lib/game-core/sequencing';
+import { selectInitialPairByDifficulty } from '@/lib/game-core/difficulty';
 import { getTimerDuration } from '@/lib/game-core/timer';
 import { getRedis } from '@/lib/redis';
 import { Token } from '@/lib/game-core/types';
@@ -41,10 +42,48 @@ export async function POST(request: NextRequest) {
     const runId = uuidv4();
     const seed = generateGameSeed();
 
-    // Select initial pair
+    // Check for active sponsor and get sponsor token
+    let sponsorToken: Token | null = null;
+    try {
+      const { getSponsorToken } = await import('@/lib/leaderboard/prizepool');
+      const sponsorInfo = await getSponsorToken();
+      
+      if (sponsorInfo) {
+        // Find sponsor token in token pool by address
+        sponsorToken = tokens.find(
+          t => t.address?.toLowerCase() === sponsorInfo.address.toLowerCase() ||
+               t.symbol.toUpperCase() === sponsorInfo.symbol.toUpperCase()
+        ) || null;
+        
+        if (!sponsorToken) {
+          console.warn(`[Game Start] Sponsor token ${sponsorInfo.symbol} not found in token pool`);
+        }
+      }
+    } catch (error) {
+      console.warn('[Game Start] Error checking for sponsor:', error);
+      // Continue with normal selection if sponsor check fails
+    }
+    
+    // Select initial pair (with sponsor token if available)
+    // For initial pair, prioritize famous tokens for easy gameplay
     let currentToken, nextToken;
     try {
-      [currentToken, nextToken] = selectInitialPair(tokens);
+      // Try famous token pair first (for easy initial gameplay)
+      const famousPair = selectFamousTokenPair(tokens, sponsorToken);
+      if (famousPair) {
+        [currentToken, nextToken] = famousPair;
+      } else {
+        // Fallback to difficulty-based selection (which also uses famous tokens for streak 0)
+        const pair = selectInitialPairByDifficulty(tokens);
+        if (pair) {
+          currentToken = pair.currentToken;
+          nextToken = pair.nextToken;
+        } else {
+          // Final fallback to regular selection
+          const { selectInitialPairWithSponsor } = await import('@/lib/game-core/sequencing');
+          [currentToken, nextToken] = selectInitialPairWithSponsor(tokens, sponsorToken);
+        }
+      }
     } catch {
       // Fallback to seeded selection if selection fails
       const pair = selectInitialPairSeeded(tokens, seed);

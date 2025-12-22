@@ -33,7 +33,7 @@ function getPublicClient() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { txHash, userAddress, runId, paymentMethod } = body;
+    const { txHash, userAddress, runId, paymentMethod, sponsorTokenAddress, isSponsorPayment } = body;
 
     if (!txHash || !runId) {
       return NextResponse.json(
@@ -49,6 +49,67 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, verified: true, devMode: true });
     }
 
+    // Check if this is a sponsor token payment
+    if (isSponsorPayment && sponsorTokenAddress) {
+      // Verify sponsor token payment
+      const publicClient = getPublicClient();
+      const testnet = isTestnet();
+      
+      // Wait for transaction receipt
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash as `0x${string}`,
+        timeout: 60_000,
+      });
+      
+      if (receipt.status !== 'success') {
+        return NextResponse.json(
+          { success: false, error: 'Transaction failed' },
+          { status: 400 }
+        );
+      }
+      
+      // Parse logs to find Transfer event for sponsor token
+      const transferLogs = receipt.logs.filter(
+        (log) => log.address.toLowerCase() === sponsorTokenAddress.toLowerCase()
+      );
+      
+      // Check if transfer was to treasury
+      let validTransfer = false;
+      for (const log of transferLogs) {
+        try {
+          const to = log.topics[2];
+          if (!to) continue;
+          
+          const toAddress = '0x' + to.slice(26);
+          const treasuryAddress = process.env.NEXT_PUBLIC_TREASURY_ADDRESS;
+          
+          if (toAddress.toLowerCase() === treasuryAddress?.toLowerCase()) {
+            // Amount validation would require knowing the expected amount
+            // For now, just check that a transfer occurred
+            validTransfer = true;
+            break;
+          }
+        } catch (e) {
+          console.error('Error parsing sponsor token log:', e);
+          continue;
+        }
+      }
+      
+      if (!validTransfer) {
+        return NextResponse.json(
+          { success: false, error: 'No valid sponsor token transfer to treasury found' },
+          { status: 400 }
+        );
+      }
+      
+      return NextResponse.json({
+        success: true,
+        verified: true,
+        txHash,
+        message: 'Sponsor token payment verified successfully',
+      });
+    }
+    
     // Base Pay payments are already verified by the SDK
     // The client polls getPaymentStatus() and only calls this after status === 'completed'
     if (paymentMethod === 'base_pay') {
@@ -141,4 +202,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
+
 

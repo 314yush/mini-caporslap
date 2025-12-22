@@ -1,6 +1,6 @@
 'use client';
 
-import { Run, ShareData } from '../game-core/types';
+import { Run, ShareData, GuessResult } from '../game-core/types';
 import { detectEnvironment } from '../environment';
 
 /**
@@ -11,20 +11,57 @@ import { detectEnvironment } from '../environment';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://caporslap.com';
 
 /**
+ * Token-specific share message templates
+ * [X] = currentToken.symbol (the token they were on)
+ * [Y] = nextToken.symbol (the token they guessed incorrectly)
+ * [ABC] = streak number
+ */
+const TOKEN_SPECIFIC_SHARE_TEMPLATES = [
+  "I'm stupid, I thought [X] had a higher mcap than [Y] 😭 Funny? You try beating my score of [ABC]",
+  "Cute of me to think [X] had a higher mcap than [Y] :) Funny? You try beating my score!",
+  "Plot twist: [X] actually has a LOWER mcap than [Y] 🤡 My [ABC] streak says otherwise",
+  "Me confidently saying [X] > [Y]: 🤓 Reality: 📉 Got rekt at streak [ABC]",
+  "That moment when you're 100% sure [X] beats [Y]... and you're wrong 💀 Streak [ABC] on CapOrSlap",
+  "I really thought [X] was bigger than [Y]... I was so wrong it's not even funny 😂 Beat my [ABC]?",
+  "The audacity of me thinking [X] > [Y] 🫠 Can you do better than streak [ABC]?",
+  "Me: '[X] definitely has higher mcap than [Y]' Also me: *gets humbled at streak [ABC]* 💀",
+  "Imagine thinking [X] beats [Y]... couldn't be me (it was me, I got rekt at [ABC]) 🎭",
+  "When you're so confident [X] > [Y] that you forget to check... streak [ABC] says hi 👋",
+];
+
+/**
  * Generates share data for a completed run
  * @param run - Completed run
  * @param customMessage - Optional custom message
  * @returns ShareData object
  */
 export function generateShareData(run: Run, customMessage?: string): ShareData {
-  const defaultMessages = [
-    `I got humbled at streak ${run.streak} on CapOrSlap 😭`,
-    `Just lost my ${run.streak} streak on CapOrSlap 💀`,
-    `RIP my ${run.streak} streak on CapOrSlap 🪦`,
-    `Got rekt at streak ${run.streak} playing CapOrSlap 📉`,
-  ];
+  let message: string;
   
-  const message = customMessage || defaultMessages[Math.floor(Math.random() * defaultMessages.length)];
+  if (customMessage) {
+    message = customMessage;
+  } else if (run.failedGuess) {
+    // Use token-specific templates when we have the failed guess info
+    const template = TOKEN_SPECIFIC_SHARE_TEMPLATES[
+      Math.floor(Math.random() * TOKEN_SPECIFIC_SHARE_TEMPLATES.length)
+    ];
+    
+    // Replace placeholders
+    message = template
+      .replace(/\[X\]/g, run.failedGuess.currentToken.symbol)
+      .replace(/\[Y\]/g, run.failedGuess.nextToken.symbol)
+      .replace(/\[ABC\]/g, run.streak.toString());
+  } else {
+    // Fallback to generic messages if no failedGuess data
+    const defaultMessages = [
+      `I got humbled at streak ${run.streak} on CapOrSlap 😭`,
+      `Just lost my ${run.streak} streak on CapOrSlap 💀`,
+      `RIP my ${run.streak} streak on CapOrSlap 🪦`,
+      `Got rekt at streak ${run.streak} playing CapOrSlap 📉`,
+    ];
+    message = defaultMessages[Math.floor(Math.random() * defaultMessages.length)];
+  }
+  
   const challengeUrl = `${APP_URL}?challenge=${run.runId}`;
   
   return {
@@ -145,9 +182,19 @@ export async function shareNative(shareData: ShareData): Promise<boolean> {
 /**
  * Gets share text for preview
  * @param streak - Streak number
+ * @param failedGuess - Optional failed guess data for token-specific preview
  * @returns Preview text
  */
-export function getSharePreview(streak: number): string {
+export function getSharePreview(streak: number, failedGuess?: GuessResult | null): string {
+  if (failedGuess) {
+    // Use a token-specific template for preview
+    const template = TOKEN_SPECIFIC_SHARE_TEMPLATES[0]; // Use first template for consistency
+    const message = template
+      .replace(/\[X\]/g, failedGuess.currentToken.symbol)
+      .replace(/\[Y\]/g, failedGuess.nextToken.symbol)
+      .replace(/\[ABC\]/g, streak.toString());
+    return `${message}\n\nCan you beat me?\n[link]`;
+  }
   return `I got humbled at streak ${streak} on CapOrSlap 😭\n\nCan you beat me?\n[link]`;
 }
 
@@ -172,6 +219,29 @@ export function getWarpcastShareUrl(shareData: ShareData): string {
   const embed = encodeURIComponent(shareData.url);
   return `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
 }
+
+/**
+ * Generates leaderboard share text
+ * @param rank - User's rank
+ * @param score - User's score (streak or cumulative)
+ * @param type - Leaderboard type
+ * @param prizeEstimate - Optional prize estimate
+ * @returns Share text
+ */
+export function generateLeaderboardShareText(
+  rank: number,
+  score: number,
+  type: 'weekly' | 'global',
+  prizeEstimate?: number
+): string {
+  if (type === 'weekly' && prizeEstimate) {
+    return `I'm ranked #${rank} on CapOrSlap with ${score} score! $${prizeEstimate.toFixed(2)} estimated prize this week 🏆`;
+  }
+  return `I'm ranked #${rank} on CapOrSlap with ${score} score! 🏆`;
+}
+
+
+
 
 
 

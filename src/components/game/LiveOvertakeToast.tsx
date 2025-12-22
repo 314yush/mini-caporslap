@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 export interface LiveOvertakeData {
   overtakenUserId: string;
@@ -103,11 +103,11 @@ export function LiveOvertakeQueue({ overtakes, onClear }: LiveOvertakeQueueProps
     // Process queue one at a time
     if (!processingRef.current && !currentOvertake && queue.length > 0) {
       processingRef.current = true;
-      // Avoid synchronous setState in effect body (can cascade renders).
-      queueMicrotask(() => {
+      // Use setTimeout to ensure state updates are batched properly
+      setTimeout(() => {
         setCurrentOvertake(queue[0]);
         setQueue(prev => prev.slice(1));
-      });
+      }, 0);
     }
   }, [currentOvertake, queue]);
 
@@ -123,10 +123,21 @@ export function LiveOvertakeQueue({ overtakes, onClear }: LiveOvertakeQueueProps
     }
   }, [currentOvertake, queue.length, shownOvertakes.size, onClear]);
 
-  const handleDismiss = () => {
+  const handleDismiss = useCallback(() => {
     setCurrentOvertake(null);
     processingRef.current = false;
-  };
+    
+    // If there are more in queue, process next one after a short delay
+    if (queue.length > 0) {
+      setTimeout(() => {
+        if (!processingRef.current) {
+          processingRef.current = true;
+          setCurrentOvertake(queue[0]);
+          setQueue(prev => prev.slice(1));
+        }
+      }, 300); // Small delay between notifications
+    }
+  }, [queue]);
 
   if (!currentOvertake) return null;
 

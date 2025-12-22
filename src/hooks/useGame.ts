@@ -9,7 +9,7 @@ import {
   Token
 } from '@/lib/game-core/types';
 import { compareMarketCaps, generateLossExplanation } from '@/lib/game-core/comparison';
-import { getReprieveState } from '@/lib/game-core/reprieve';
+import { canOfferReprieve } from '@/lib/game-core/reprieve';
 import { getStreakTier, getStreakMilestoneMessage } from '@/lib/game-core/streak';
 import { getTierName } from '@/lib/game-core/difficulty';
 import { OvertakeEvent } from '@/lib/leaderboard/overtake';
@@ -83,7 +83,17 @@ export function useGame(userId: string): UseGameReturn {
   const tokenDisplayTimeRef = useRef<number | null>(null);
 
   // Check for live overtakes after streak increases
-  const checkLiveOvertakes = useCallback(async (newStreak: number, previousStreak: number) => {
+  const checkLiveOvertakes = useCallback(async (newStreak: number, previousStreak: number, retryCount = 0) => {
+    // Only check if streak actually increased
+    if (newStreak <= previousStreak) {
+      return;
+    }
+    
+    // Debounce: only check if there's a meaningful increase
+    if (newStreak - previousStreak < 1) {
+      return;
+    }
+    
     try {
       const response = await fetch('/api/leaderboard/check-overtakes', {
         method: 'POST',
@@ -93,12 +103,30 @@ export function useGame(userId: string): UseGameReturn {
       
       if (response.ok) {
         const data = await response.json();
-        if (data.overtakes && data.overtakes.length > 0) {
-          setLiveOvertakes(data.overtakes);
+        if (data.success && data.overtakes && data.overtakes.length > 0) {
+          // Add new overtakes to existing ones (avoid duplicates)
+          setLiveOvertakes(prev => {
+            const existingIds = new Set(prev.map(o => o.overtakenUserId));
+            const newOvertakes = data.overtakes.filter(
+              (o: LiveOvertakeData) => !existingIds.has(o.overtakenUserId)
+            );
+            return [...prev, ...newOvertakes];
+          });
         }
+      } else if (response.status >= 500 && retryCount < 2) {
+        // Retry on server errors (max 2 retries)
+        setTimeout(() => {
+          checkLiveOvertakes(newStreak, previousStreak, retryCount + 1);
+        }, 1000 * (retryCount + 1)); // Exponential backoff
       }
     } catch (err) {
       console.error('Failed to check overtakes:', err);
+      // Retry on network errors (max 2 retries)
+      if (retryCount < 2) {
+        setTimeout(() => {
+          checkLiveOvertakes(newStreak, previousStreak, retryCount + 1);
+        }, 1000 * (retryCount + 1));
+      }
     }
   }, [userId]);
 
@@ -483,7 +511,9 @@ export function useGame(userId: string): UseGameReturn {
   }, [userId, gameState.runId, startGame]);
 
   // Derived values
-  const reprieveState = getReprieveState(gameState.streak, gameState.hasUsedReprieve);
+  // Note: getReprieveState is now async, but we can't use async in useMemo
+  // This will need to be handled differently - for now, use a simplified version
+  const canUseReprieve = canOfferReprieve(gameState.streak, gameState.hasUsedReprieve);
   const streakTier = getStreakTier(gameState.streak);
   const milestoneMessage = getStreakMilestoneMessage(gameState.streak);
   const lossExplanation = lastResult && !lastResult.correct 
@@ -504,7 +534,7 @@ export function useGame(userId: string): UseGameReturn {
     activateReprieve,
     playAgain,
     clearLiveOvertakes,
-    canUseReprieve: reprieveState.available,
+    canUseReprieve,
     streakTier,
     milestoneMessage,
     completedRun,

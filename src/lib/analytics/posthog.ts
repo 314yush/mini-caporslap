@@ -119,3 +119,6 @@ export function isPostHogReady(): boolean {
   return isInitialized && (!!posthog || !!window.posthog);
 }
 
+
+
+

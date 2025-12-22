@@ -228,3 +228,58 @@ export async function sendHighScoreNotification(
   console.log('[Notifications] High score notification result:', result);
 }
 
+/**
+ * Sends a notification when user's rank changes
+ */
+export async function sendPositionChangeNotification(
+  fid: number,
+  appFid: number,
+  previousRank: number,
+  currentRank: number,
+  direction: 'up' | 'down'
+): Promise<void> {
+  const rankChange = Math.abs(currentRank - previousRank);
+  
+  if (direction === 'up') {
+    const result = await sendNotification({
+      fid,
+      appFid,
+      title: '📈 Rank Improved!',
+      body: `You moved up ${rankChange} position${rankChange > 1 ? 's' : ''}! Now ranked #${currentRank}.`,
+    });
+    console.log('[Notifications] Position change notification result:', result);
+  } else if (direction === 'down' && currentRank <= 50) {
+    // Only notify if still in top 50
+    const result = await sendNotification({
+      fid,
+      appFid,
+      title: '📉 Rank Changed',
+      body: `You're now ranked #${currentRank}. Keep playing to climb back up!`,
+    });
+    console.log('[Notifications] Position change notification result:', result);
+  }
+}
+
+/**
+ * Sends a notification when user enters or is in prize range
+ */
+export async function sendPrizePoolRankNotification(
+  fid: number,
+  appFid: number,
+  rank: number,
+  prizeEstimate: number
+): Promise<void> {
+  if (rank <= 50) {
+    const result = await sendNotification({
+      fid,
+      appFid,
+      title: '💰 In Prize Range!',
+      body: `You're ranked #${rank}! Estimated prize: $${prizeEstimate.toFixed(2)}. Keep playing!`,
+    });
+    console.log('[Notifications] Prize pool rank notification result:', result);
+  }
+}
+
+
+
+

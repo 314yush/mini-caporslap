@@ -3,6 +3,8 @@
  * Organized by category for diverse gameplay
  */
 
+import { Token } from '../game-core/types';
+
 export type TokenCategory = 
   | 'l1_chains'      // Layer 1 blockchains
   | 'l2_chains'      // Layer 2 solutions
@@ -185,5 +187,34 @@ export function findTokenInfoBySymbol(symbol: string): TokenInfo | undefined {
  */
 export function findTokenInfoById(id: string): TokenInfo | undefined {
   return CURATED_TOKENS.find(t => t.id === id);
+}
+
+/**
+ * List of famous token symbols that are well-known regardless of market cap
+ * These are tokens that most crypto users would recognize
+ */
+const FAMOUS_TOKEN_SYMBOLS = new Set([
+  'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE', 'ADA', 'AVAX', 'SHIB', 
+  'PEPE', 'BONK', 'WIF', 'LINK', 'UNI', 'DOT', 'POL', 'MATIC', 'ARB', 
+  'OP', 'LTC', 'ATOM'
+]);
+
+/**
+ * Check if a token is considered "famous" (top 20 by market cap OR in curated famous list)
+ * @param token - Token to check
+ * @param allTokens - All available tokens (for market cap ranking)
+ * @returns True if token is famous
+ */
+export function isFamousToken(token: Token, allTokens: Token[]): boolean {
+  // Check if in curated famous list
+  if (FAMOUS_TOKEN_SYMBOLS.has(token.symbol.toUpperCase())) {
+    return true;
+  }
+  
+  // Check if in top 20 by market cap
+  const sortedByMcap = [...allTokens].sort((a, b) => b.marketCap - a.marketCap);
+  const top20 = sortedByMcap.slice(0, 20);
+  
+  return top20.some(t => t.id === token.id);
 }
 

@@ -10,6 +10,13 @@ export interface ReprieveState {
   price: number;
   minStreak: number;
   currency: 'USD' | 'ETH' | 'USDC';
+  sponsorToken?: {
+    address: string;
+    symbol: string;
+    name: string;
+    logoUrl?: string;
+  };
+  reprieveCount?: number; // Number of reprieves used in this game
 }
 
 export interface ReprieveResult {
@@ -55,30 +62,92 @@ export function canOfferReprieve(
 }
 
 /**
+ * Gets active sponsor (if any)
+ */
+export async function getActiveSponsor(): Promise<{
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenName: string;
+  logoUrl?: string;
+  companyName: string;
+  reprievePrice: number;
+} | null> {
+  try {
+    const { getSponsor } = await import('@/lib/leaderboard/prizepool');
+    return await getSponsor();
+  } catch (error) {
+    console.error('Error fetching active sponsor:', error);
+    return null;
+  }
+}
+
+/**
+ * Calculates reprieve price with exponential pricing
+ * Formula: basePrice * (1.5 ^ (reprieveCount))
+ * @param basePrice - Base price (default $1)
+ * @param reprieveCount - Number of reprieves already used (0-indexed)
+ * @returns Calculated price
+ */
+export function calculateReprievePrice(basePrice: number, reprieveCount: number): number {
+  if (reprieveCount <= 0) return basePrice;
+  return basePrice * Math.pow(1.5, reprieveCount);
+}
+
+/**
  * Gets reprieve state for display
  * @param streak - Current streak
  * @param hasUsedReprieve - Whether reprieve was already used
+ * @param reprieveCount - Number of reprieves used in this game (for exponential pricing)
  * @returns Reprieve state object
  */
-export function getReprieveState(
+export async function getReprieveState(
   streak: number,
-  hasUsedReprieve: boolean
-): ReprieveState {
+  hasUsedReprieve: boolean,
+  reprieveCount: number = 0
+): Promise<ReprieveState> {
+  const sponsor = await getActiveSponsor();
+  
+  // If sponsor is active, use sponsor token pricing
+  if (sponsor) {
+    const price = calculateReprievePrice(sponsor.reprievePrice || REPRIEVE_PRICE, reprieveCount);
+    return {
+      available: canOfferReprieve(streak, hasUsedReprieve),
+      used: hasUsedReprieve,
+      price,
+      minStreak: MIN_STREAK_FOR_REPRIEVE,
+      currency: 'USD', // Price is in USD, but payment is in sponsor token
+      sponsorToken: {
+        address: sponsor.tokenAddress,
+        symbol: sponsor.tokenSymbol,
+        name: sponsor.tokenName,
+        logoUrl: sponsor.logoUrl,
+      },
+      reprieveCount,
+    };
+  }
+  
+  // No sponsor - use regular USDC pricing
+  const price = calculateReprievePrice(REPRIEVE_PRICE, reprieveCount);
   return {
     available: canOfferReprieve(streak, hasUsedReprieve),
     used: hasUsedReprieve,
-    price: REPRIEVE_PRICE,
+    price,
     minStreak: MIN_STREAK_FOR_REPRIEVE,
     currency: REPRIEVE_CURRENCY,
+    reprieveCount,
   };
 }
 
 /**
  * Generates the reprieve offer copy
  * @param streak - Current streak
+ * @param reprieveState - Reprieve state (includes price and sponsor info)
  * @returns Copy for the reprieve button
  */
-export function getReprieveCopy(streak: number): {
+export function getReprieveCopy(
+  streak: number,
+  reprieveState: ReprieveState
+): {
   title: string;
   description: string;
   buttonText: string;
@@ -86,12 +155,16 @@ export function getReprieveCopy(streak: number): {
 } {
   const priceText = REPRIEVE_FREE 
     ? 'FREE (testing)' 
-    : `$${REPRIEVE_PRICE.toFixed(2)}`;
+    : `$${reprieveState.price.toFixed(2)}`;
+  
+  const sponsorText = reprieveState.sponsorToken
+    ? ` (${reprieveState.sponsorToken.symbol})`
+    : '';
   
   return {
     title: 'One Last Candle',
     description: `Keep your ${streak} streak alive`,
-    buttonText: `Continue for ${priceText}`,
+    buttonText: `Continue for ${priceText}${sponsorText}`,
     emoji: '🕯️',
   };
 }
@@ -229,7 +302,8 @@ export async function processReprieve(
   userId: string,
   runId: string,
   streak: number,
-  hasUsedReprieve: boolean
+  hasUsedReprieve: boolean,
+  reprieveCount: number = 0
 ): Promise<ReprieveResult> {
   // Check if reprieve is available
   if (!canOfferReprieve(streak, hasUsedReprieve)) {
@@ -242,6 +316,9 @@ export async function processReprieve(
     };
   }
   
+  // Get reprieve state to check for sponsor
+  const reprieveState = await getReprieveState(streak, hasUsedReprieve, reprieveCount);
+  
   // If free, just allow it
   if (REPRIEVE_FREE) {
     return {
@@ -251,12 +328,24 @@ export async function processReprieve(
     };
   }
   
-  // Process payment
+  // If sponsor is active, use sponsor token payment
+  if (reprieveState.sponsorToken) {
+    // Sponsor token payment will be handled by sponsor-payment.ts
+    return {
+      success: true,
+      paymentRequired: true,
+      paymentAmount: reprieveState.price,
+      paymentCurrency: 'USD', // Price in USD, but payment in sponsor token
+      transactionId: undefined, // Will be set after payment
+    };
+  }
+  
+  // Process regular USDC payment
   const provider = getPaymentProvider();
   const request: PaymentRequest = {
     userId,
     runId,
-    amount: REPRIEVE_PRICE,
+    amount: reprieveState.price,
     currency: REPRIEVE_CURRENCY,
     streak,
   };

@@ -4,6 +4,7 @@
  */
 
 import { Token } from './types';
+import { isFamousToken } from '../data/token-categories';
 
 /**
  * Difficulty tier configuration
@@ -84,6 +85,15 @@ export function getTierName(streak: number): string {
 }
 
 /**
+ * Get all famous tokens from the pool
+ * @param tokens - All available tokens
+ * @returns Array of famous tokens
+ */
+export function getFamousTokens(tokens: Token[]): Token[] {
+  return tokens.filter(token => isFamousToken(token, tokens));
+}
+
+/**
  * Filter token pool by tier (returns top N tokens by market cap)
  */
 export function filterTokenPoolByTier(tokens: Token[], tier: DifficultyTier): Token[] {
@@ -147,35 +157,55 @@ export function selectNextTokenByDifficulty(
 ): Token | null {
   const tier = getTierForStreak(streak);
   
+  // For streaks 0-4, prioritize famous tokens
+  let candidatePool = allTokens;
+  if (streak >= 0 && streak <= 4) {
+    const famousTokens = getFamousTokens(allTokens);
+    if (famousTokens.length >= 2) {
+      // Use famous tokens as primary pool, but allow fallback to all tokens
+      candidatePool = famousTokens;
+    }
+  }
+  
   // First, filter pool by tier size
-  const tierPool = filterTokenPoolByTier(allTokens, tier);
+  const tierPool = filterTokenPoolByTier(candidatePool, tier);
   
   // Find candidates within mcap ratio constraints
   let candidates = findValidCandidates(tierPool, currentToken, tier, recentTokenIds);
   
   // If no valid candidates found, gradually relax constraints
   if (candidates.length === 0) {
-    // Try with full pool but keep ratio constraints
-    candidates = findValidCandidates(allTokens, currentToken, tier, recentTokenIds);
+    // Try with full candidate pool but keep ratio constraints
+    candidates = findValidCandidates(candidatePool, currentToken, tier, recentTokenIds);
   }
   
   // If still no candidates, relax ratio constraints
   if (candidates.length === 0) {
     // Use Easy tier constraints as fallback
     const easyTier = DIFFICULTY_TIERS[0];
-    candidates = findValidCandidates(allTokens, currentToken, easyTier, recentTokenIds);
+    candidates = findValidCandidates(candidatePool, currentToken, easyTier, recentTokenIds);
   }
   
-  // Final fallback: any token except current and recent
+  // Final fallback: any token except current and recent (from candidate pool)
   if (candidates.length === 0) {
-    candidates = allTokens.filter(t => 
+    candidates = candidatePool.filter(t => 
       t.id !== currentToken.id && !recentTokenIds.includes(t.id)
     );
   }
   
-  // Absolute fallback: any token except current
+  // Absolute fallback: any token except current (from candidate pool)
   if (candidates.length === 0) {
-    candidates = allTokens.filter(t => t.id !== currentToken.id);
+    candidates = candidatePool.filter(t => t.id !== currentToken.id);
+  }
+  
+  // If still no candidates and we were using famous tokens, fallback to all tokens
+  if (candidates.length === 0 && streak >= 0 && streak <= 4 && candidatePool !== allTokens) {
+    candidates = allTokens.filter(t => 
+      t.id !== currentToken.id && !recentTokenIds.includes(t.id)
+    );
+    if (candidates.length === 0) {
+      candidates = allTokens.filter(t => t.id !== currentToken.id);
+    }
   }
   
   if (candidates.length === 0) {
@@ -210,6 +240,7 @@ export function selectNextTokenByDifficulty(
 
 /**
  * Select initial pair with appropriate difficulty for streak 0
+ * Uses famous tokens for easy initial gameplay
  */
 export function selectInitialPairByDifficulty(
   allTokens: Token[]
@@ -218,11 +249,24 @@ export function selectInitialPairByDifficulty(
     return null;
   }
   
+  // For initial pair (streak 0), use famous tokens
+  const famousTokens = getFamousTokens(allTokens);
+  const tokenPool = famousTokens.length >= 2 ? famousTokens : allTokens;
+  
   const tier = getTierForStreak(0); // Easy tier for initial
-  const tierPool = filterTokenPoolByTier(allTokens, tier);
+  const tierPool = filterTokenPoolByTier(tokenPool, tier);
   
   if (tierPool.length < 2) {
-    return null;
+    // Fallback to full pool if tier pool is too small
+    if (tokenPool.length < 2) {
+      return null;
+    }
+    // Use full token pool
+    const shuffled = [...tokenPool].sort(() => Math.random() - 0.5);
+    const currentToken = shuffled[0];
+    const nextToken = selectNextTokenByDifficulty(tokenPool, currentToken, 0, []);
+    if (!nextToken) return null;
+    return { currentToken, nextToken };
   }
   
   // Pick a random token from the pool as current
@@ -272,5 +316,8 @@ export function getDifficultyInfo(streak: number): {
     nextTierAt: nextTier ? nextTier.minStreak : null,
   };
 }
+
+
+
 
 

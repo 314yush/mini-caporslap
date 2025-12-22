@@ -254,3 +254,6 @@ Once setup is complete:
 - **What files to copy?** → See `ARCHITECTURE.md` → "Shared Code" section
 - **How to implement Privy?** → See `AUTH_ABSTRACTION.md`
 - **How to sync future changes?** → See `SYNC_GUIDE.md`
+
+
+
