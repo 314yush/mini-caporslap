@@ -52,6 +52,10 @@ interface UseGameReturn {
   streakTier: 0 | 1 | 2 | 3;
   milestoneMessage: string | null;
   completedRun: Run | null;
+  winInfo: {
+    type: 'personal_best' | 'top_3';
+    rank?: number;
+  } | null;
 }
 
 const initialGameState: GameState = {
@@ -76,6 +80,10 @@ export function useGame(userId: string): UseGameReturn {
   const [completedRun, setCompletedRun] = useState<Run | null>(null);
   const [overtakes, setOvertakes] = useState<OvertakeEvent[]>([]);
   const [liveOvertakes, setLiveOvertakes] = useState<LiveOvertakeData[]>([]);
+  const [winInfo, setWinInfo] = useState<{
+    type: 'personal_best' | 'top_3';
+    rank?: number;
+  } | null>(null);
   
   // Analytics tracking refs
   const gameStartTimeRef = useRef<number | null>(null);
@@ -297,6 +305,25 @@ export function useGame(userId: string): UseGameReturn {
           if (data.overtakes && data.overtakes.length > 0) {
             setOvertakes(data.overtakes);
           }
+          
+          // Detect wins: personal best OR top 3
+          const isNewBest = data.isNewBest === true;
+          const newRank = data.newRank || 0;
+          const isTop3 = newRank > 0 && newRank <= 3;
+          
+          if (isNewBest || isTop3) {
+            // Determine win type - prioritize top 3 if both conditions are met
+            if (isTop3) {
+              setWinInfo({
+                type: 'top_3',
+                rank: newRank,
+              });
+            } else if (isNewBest) {
+              setWinInfo({
+                type: 'personal_best',
+              });
+            }
+          }
         })
         .catch(console.error);
     }
@@ -499,6 +526,7 @@ export function useGame(userId: string): UseGameReturn {
     setCompletedRun(null);
     setOvertakes([]);
     setLiveOvertakes([]);
+    setWinInfo(null);
     gameStartTimeRef.current = null;
     tokenDisplayTimeRef.current = null;
   }, [gameState.streak]);
@@ -538,5 +566,6 @@ export function useGame(userId: string): UseGameReturn {
     streakTier,
     milestoneMessage,
     completedRun,
+    winInfo,
   };
 }

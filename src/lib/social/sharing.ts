@@ -30,6 +30,24 @@ const TOKEN_SPECIFIC_SHARE_TEMPLATES = [
 ];
 
 /**
+ * Win-specific share message templates (humble brag style)
+ * [ABC] = streak number
+ * [RANK] = leaderboard rank (if top 3)
+ */
+const WIN_SHARE_TEMPLATES = [
+  "Not to flex but I just hit streak [ABC] on CapOrSlap 😎 Think you can beat it?",
+  "Just casually got [ABC] streak... no big deal 🫣 Can you do better?",
+  "POV: You just hit your new PB of [ABC] 🎯 Challenge accepted?",
+  "Ranked #[RANK] with [ABC] streak - feeling pretty good about this one 🏆",
+  "So I may have just achieved [ABC] streak... just saying 🤷‍♂️ Beat it if you can!",
+  "New personal best: [ABC] streak unlocked! 🎉 Who's next?",
+  "Not trying to brag but [ABC] streak happened and I'm not mad about it 😏",
+  "Just hit [ABC] streak and I'm feeling myself a little bit 💪 Can you top it?",
+  "Rank #[RANK] with [ABC] streak - I'm not saying I'm the best but... 🏆",
+  "Casually flexing my [ABC] streak real quick 🫠 Think you got what it takes?",
+];
+
+/**
  * Generates share data for a completed run
  * @param run - Completed run
  * @param customMessage - Optional custom message
@@ -218,6 +236,47 @@ export function getWarpcastShareUrl(shareData: ShareData): string {
   const text = encodeURIComponent(`${shareData.message}\n\nCan you beat me?`);
   const embed = encodeURIComponent(shareData.url);
   return `https://warpcast.com/~/compose?text=${text}&embeds[]=${embed}`;
+}
+
+/**
+ * Generates share data for a win (personal best or top 3)
+ * @param run - Completed run
+ * @param winType - Type of win ('personal_best' or 'top_3')
+ * @param rank - Optional rank if top 3
+ * @returns ShareData object
+ */
+export function generateWinShareData(
+  run: Run,
+  winType: 'personal_best' | 'top_3',
+  rank?: number
+): ShareData {
+  // Select a random template
+  const template = WIN_SHARE_TEMPLATES[
+    Math.floor(Math.random() * WIN_SHARE_TEMPLATES.length)
+  ];
+  
+  // Replace placeholders
+  let message = template
+    .replace(/\[ABC\]/g, run.streak.toString());
+  
+  // Replace rank placeholder if provided, otherwise remove rank-related text
+  if (rank !== undefined) {
+    message = message.replace(/\[RANK\]/g, rank.toString());
+  } else {
+    // Remove rank-related templates if no rank provided
+    message = message.replace(/Ranked #\[RANK\] /g, '');
+    message = message.replace(/Rank #\[RANK\] /g, '');
+  }
+  
+  const challengeUrl = `${APP_URL}?challenge=${run.runId}`;
+  
+  return {
+    streak: run.streak,
+    runId: run.runId,
+    userId: run.userId,
+    message,
+    url: challengeUrl,
+  };
 }
 
 /**

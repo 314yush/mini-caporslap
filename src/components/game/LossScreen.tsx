@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Run } from '@/lib/game-core/types';
 import { formatMarketCap } from '@/lib/game-core/comparison';
 import { generateShareData, generateShareText, shareToClipboard } from '@/lib/social/sharing';
@@ -150,6 +151,16 @@ export function LossScreen({
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 px-6 overflow-y-auto py-8">
       {/* Dramatic vignette */}
       <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-black/50 pointer-events-none" />
+      
+      {/* Leaderboard link - top right */}
+      <div className="absolute top-4 right-4 z-30 pointer-events-auto">
+        <Link 
+          href="/leaderboard" 
+          className="bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 text-white/60 hover:text-white text-sm font-medium transition-colors"
+        >
+          🏆
+        </Link>
+      </div>
       
       <div className="relative flex flex-col items-center gap-5 max-w-sm w-full">
         {/* Skull emoji */}

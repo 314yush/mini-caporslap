@@ -6,7 +6,6 @@
 'use client';
 
 import { detectEnvironment } from '@/lib/environment';
-import { useAuthDev } from '@/hooks/useAuthDev';
 import type { PlatformUser } from '../types';
 
 // Session storage keys
@@ -41,18 +40,7 @@ export const FarcasterAuthHelpers = {
   /**
    * Check for existing Farcaster session
    */
-  async checkExistingSession(isDevelopment: boolean, devAuth: ReturnType<typeof useAuthDev>) {
-    if (isDevelopment) {
-      if (devAuth.isConnected && devAuth.fid && devAuth.user) {
-        return {
-          token: 'dev_token',
-          user: devAuth.user,
-          fid: devAuth.fid,
-        };
-      }
-      return null;
-    }
-
+  async checkExistingSession(isDevelopment: boolean) {
     // Production mode: check for Quick Auth token
     const storedToken = sessionStorage.getItem(AUTH_TOKEN_KEY);
     const storedUser = sessionStorage.getItem(AUTH_USER_KEY);
@@ -70,25 +58,13 @@ export const FarcasterAuthHelpers = {
   },
 
   /**
-   * Login using Farcaster Quick Auth or dev wallet
+   * Login using Farcaster Quick Auth
    */
-  async login(isDevelopment: boolean, devAuth: ReturnType<typeof useAuthDev>): Promise<{
+  async login(isDevelopment: boolean): Promise<{
     token: string;
     user: FarcasterUser;
     fid: number;
   }> {
-    if (isDevelopment) {
-      await devAuth.connect();
-      if (devAuth.fid && devAuth.user) {
-        return {
-          token: 'dev_token',
-          user: devAuth.user,
-          fid: devAuth.fid,
-        };
-      }
-      throw new Error('Dev auth connection failed');
-    }
-
     // Production mode: use Quick Auth
     const { sdk } = await import('@farcaster/miniapp-sdk');
     const result = await sdk.quickAuth.getToken();
@@ -142,12 +118,8 @@ export const FarcasterAuthHelpers = {
   /**
    * Logout and clear session
    */
-  logout(isDevelopment: boolean, devAuth: ReturnType<typeof useAuthDev>) {
+  logout(isDevelopment: boolean) {
     sessionStorage.removeItem(AUTH_TOKEN_KEY);
     sessionStorage.removeItem(AUTH_USER_KEY);
-    
-    if (isDevelopment) {
-      devAuth.disconnect();
-    }
   },
 };

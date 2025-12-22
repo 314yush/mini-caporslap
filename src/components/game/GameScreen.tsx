@@ -8,6 +8,7 @@ import { Token, Guess } from '@/lib/game-core/types';
 import { formatMarketCap } from '@/lib/game-core/comparison';
 import { CorrectOverlay } from './CorrectOverlay';
 import { LossScreen } from './LossScreen';
+import { WinScreen } from './WinScreen';
 import { TokenInfoTooltip } from './TokenInfoTooltip';
 import { GameTimer } from './GameTimer';
 import { LiveOvertakeQueue } from './LiveOvertakeToast';
@@ -54,6 +55,7 @@ export function GameScreen() {
     completedRun,
     liveOvertakes,
     clearLiveOvertakes,
+    winInfo,
   } = useGame(userId);
   
   // Track token display time for guess timing analytics (using ref, not state)
@@ -189,6 +191,18 @@ export function GameScreen() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  // Win screen (if personal best or top 3)
+  if (gameState.phase === 'loss' && completedRun && winInfo) {
+    return (
+      <WinScreen
+        run={completedRun}
+        winType={winInfo.type}
+        rank={winInfo.rank}
+        onPlayAgain={playAgain}
+      />
     );
   }
 

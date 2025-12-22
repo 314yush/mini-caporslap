@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { detectEnvironment } from '@/lib/environment';
-import { useAuthDev } from './useAuthDev';
 import { FarcasterAuthHelpers, farcasterUserToPlatformUser } from '@/lib/auth/platforms/farcaster';
 import type { PlatformUser } from '@/lib/auth/types';
 
@@ -47,13 +46,12 @@ export function useAuth(): AuthState {
 
   // Check if we're in development mode (not in Base App)
   const isDevelopment = typeof window !== 'undefined' && detectEnvironment() === 'web';
-  const devAuth = useAuthDev();
 
   // Check for existing session on mount
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
-        const session = await FarcasterAuthHelpers.checkExistingSession(isDevelopment, devAuth);
+        const session = await FarcasterAuthHelpers.checkExistingSession(isDevelopment);
         
         if (session) {
           setToken(session.token);
@@ -68,21 +66,21 @@ export function useAuth(): AuthState {
       } catch (error) {
         console.error('[useAuth] Error checking existing session:', error);
         // Clear invalid session data
-        FarcasterAuthHelpers.logout(isDevelopment, devAuth);
+        FarcasterAuthHelpers.logout(isDevelopment);
       } finally {
         setIsReady(true);
       }
     };
 
     checkExistingSession();
-  }, [isDevelopment, devAuth.isConnected, devAuth.fid, devAuth.user]);
+  }, [isDevelopment]);
 
   // Login using Quick Auth (production) or Wallet (development)
   const login = useCallback(async () => {
     setIsLoading(true);
     
     try {
-      const result = await FarcasterAuthHelpers.login(isDevelopment, devAuth);
+      const result = await FarcasterAuthHelpers.login(isDevelopment);
       
       // Store auth state
       setToken(result.token);
@@ -99,7 +97,7 @@ export function useAuth(): AuthState {
     } finally {
       setIsLoading(false);
     }
-  }, [isDevelopment, devAuth]);
+  }, [isDevelopment]);
 
   // Logout
   const logout = useCallback(() => {
@@ -110,8 +108,8 @@ export function useAuth(): AuthState {
     setIsAuthenticated(false);
     
     // Clear session using helper
-    FarcasterAuthHelpers.logout(isDevelopment, devAuth);
-  }, [isDevelopment, devAuth]);
+    FarcasterAuthHelpers.logout(isDevelopment);
+  }, [isDevelopment]);
 
   return {
     isReady,

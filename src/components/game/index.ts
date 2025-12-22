@@ -5,6 +5,7 @@ export { ActionButtons } from './ActionButtons';
 export { StreakDisplay } from './StreakDisplay';
 export { CorrectOverlay } from './CorrectOverlay';
 export { LossScreen } from './LossScreen';
+export { WinScreen } from './WinScreen';
 export { TokenInfoTooltip } from './TokenInfoTooltip';
 export { GameTimer, CompactTimer, TimerWithTier } from './GameTimer';
 export { OvertakeQueue, OvertakeSummary } from './OvertakeNotification';

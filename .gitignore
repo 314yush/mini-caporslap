@@ -43,3 +43,5 @@ next-env.d.ts
 # mock data (local testing only)
 src/lib/mock-leaderboard.ts
 src/app/api/debug/
+# dev mode (local testing only)
+src/hooks/useAuthDev.ts
