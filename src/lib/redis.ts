@@ -493,11 +493,20 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
             try {
               const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
               const identity = await resolveIdentity(parsed.address);
+              // Determine user type
+              let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+              if (identity.source === 'farcaster') {
+                userType = 'farcaster';
+              } else if (/^0x[a-fA-F0-9]{40}$/i.test(identity.address)) {
+                userType = 'wallet';
+              } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity.address)) {
+                userType = 'privy';
+              }
               // Only update if we got a better resolution (not just address fallback)
               if (identity.source !== 'address') {
                 user = {
                   userId: identity.address,
-                  userType: identity.source === 'farcaster' ? 'farcaster' : 'wallet',
+                  userType,
                   displayName: identity.displayName,
                   avatarUrl: identity.avatarUrl,
                 };
@@ -523,9 +532,18 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
             }
           } else {
             // Already resolved (ENS, Farcaster, etc.) - use stored data
+            // Determine user type from stored data
+            let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+            if (parsed.source === 'farcaster') {
+              userType = 'farcaster';
+            } else if (/^0x[a-fA-F0-9]{40}$/i.test(parsed.address)) {
+              userType = 'wallet';
+            } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.address)) {
+              userType = 'privy';
+            }
             user = {
               userId: parsed.address,
-              userType: parsed.source === 'farcaster' ? 'farcaster' : 'wallet',
+              userType,
               displayName: parsed.displayName,
               avatarUrl: parsed.avatarUrl,
             };
@@ -539,11 +557,20 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
             try {
               const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
               const identity = await resolveIdentity(user.userId);
+              // Determine user type
+              let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+              if (identity.source === 'farcaster') {
+                userType = 'farcaster';
+              } else if (/^0x[a-fA-F0-9]{40}$/i.test(identity.address)) {
+                userType = 'wallet';
+              } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity.address)) {
+                userType = 'privy';
+              }
               // Only update if we got a better resolution
               if (identity.source !== 'address') {
                 user = {
                   userId: identity.address,
-                  userType: identity.source === 'farcaster' ? 'farcaster' : 'wallet',
+                  userType,
                   displayName: identity.displayName,
                   avatarUrl: identity.avatarUrl || user.avatarUrl,
                 };
@@ -556,22 +583,40 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
           }
         }
       } else {
-        // No profile found - try to resolve identity if it's an Ethereum address
-        if (/^0x[a-fA-F0-9]{40}$/.test(userId)) {
+        // No profile found - try to resolve identity
+        // Check if it's an Ethereum address, FID (numeric), or other format
+        const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(userId);
+        const isFID = /^\d+$/.test(userId);
+        
+        if (isEthereumAddress || isFID) {
           // Import resolveIdentity dynamically to avoid circular dependency
           const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
           try {
             const identity = await resolveIdentity(userId);
+            // Determine user type
+            let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+            if (identity.source === 'farcaster') {
+              userType = 'farcaster';
+            } else if (/^0x[a-fA-F0-9]{40}$/i.test(identity.address)) {
+              userType = 'wallet';
+            } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity.address)) {
+              userType = 'privy';
+            }
             user = {
               userId: identity.address,
-              userType: identity.source === 'farcaster' ? 'farcaster' : 'wallet',
+              userType,
               displayName: identity.displayName,
               avatarUrl: identity.avatarUrl,
             };
             // Cache the resolved identity
             await client.set(KEYS.userProfile(userId), JSON.stringify(identity), { ex: 86400 * 7 });
           } catch (error) {
-            user = { userId, userType: 'anon', displayName: truncateAddress(userId) };
+            // Fallback: for FIDs, show as "FID X", for addresses, truncate
+            if (isFID) {
+              user = { userId, userType: 'farcaster', displayName: `FID ${userId}` };
+            } else {
+              user = { userId, userType: 'anon', displayName: truncateAddress(userId) };
+            }
           }
         } else {
           user = { userId, userType: 'anon', displayName: 'Guest' };
@@ -584,11 +629,40 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
         continue; // Skip this entry
       }
       
+      // Detect and fix bad truncation patterns (e.g., "3626...3626" for FIDs)
+      // This happens when truncateAddress is called on short numeric strings
+      if (user.displayName && /^(\d+\.\.\.\1)$/.test(user.displayName)) {
+        // Bad pattern detected - this is a truncated FID, re-resolve it
+        const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
+        try {
+          const identity = await resolveIdentity(user.userId);
+          user.displayName = identity.displayName;
+          user.avatarUrl = identity.avatarUrl;
+          // Update cache with correct format
+          await client.set(KEYS.userProfile(user.userId), JSON.stringify(identity), { ex: 86400 * 7 });
+        } catch {
+          // If re-resolution fails, show FID format
+          if (/^\d+$/.test(user.userId)) {
+            user.displayName = `FID ${user.userId}`;
+          }
+        }
+      }
+      
       // Ensure displayName is properly formatted (never show "Guest" or full address)
       if (user.displayName === 'Guest' || (!user.displayName.includes('.') && user.displayName.length === 42 && user.displayName.startsWith('0x'))) {
         // If still showing as Guest or full address, try to truncate
         if (/^0x[a-fA-F0-9]{40}$/.test(user.userId)) {
           user.displayName = truncateAddress(user.userId);
+        } else if (/^\d+$/.test(user.userId)) {
+          // For FIDs, try to resolve username
+          const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
+          try {
+            const identity = await resolveIdentity(user.userId);
+            user.displayName = identity.displayName;
+            user.avatarUrl = identity.avatarUrl;
+          } catch {
+            user.displayName = `FID ${user.userId}`;
+          }
         } else {
           // Skip if we can't properly display
           continue;

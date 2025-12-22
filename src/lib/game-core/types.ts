@@ -6,7 +6,7 @@
 export type Environment = 'web' | 'miniapp';
 
 // User identity types
-export type UserType = 'anon' | 'wallet' | 'farcaster';
+export type UserType = 'anon' | 'wallet' | 'farcaster' | 'privy';
 
 export interface User {
   userId: string;

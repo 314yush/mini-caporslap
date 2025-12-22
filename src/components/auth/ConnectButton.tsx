@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
+import { detectEnvironment } from '@/lib/environment';
 
 interface ConnectButtonProps {
   className?: string;
@@ -8,7 +9,7 @@ interface ConnectButtonProps {
 }
 
 export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProps) {
-  const { isReady, isAuthenticated, isLoading, user, login, logout } = useAuth();
+  const { isReady, isAuthenticated, isLoading, user, platformUser, login, logout } = useAuth();
   
   const sizeClasses = {
     sm: 'py-2 px-4 text-sm',
@@ -35,10 +36,11 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
   }
   
   // User is authenticated - show their info and logout option
-  if (isAuthenticated && user) {
-    const displayName = user.username 
-      ? `@${user.username}` 
-      : user.displayName || `FID: ${user.fid}`;
+  if (isAuthenticated && (user || platformUser)) {
+    // Use platformUser if available (works for both Farcaster and Privy)
+    // Otherwise fall back to Farcaster user format
+    const displayName = platformUser?.displayName || 
+      (user?.username ? `@${user.username}` : user?.displayName || (user?.fid ? `FID: ${user.fid}` : 'User'));
     
     return (
       <button
@@ -59,9 +61,8 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
   }
   
   // Not authenticated - show sign in button
-  const isDevelopment = typeof window !== 'undefined' && 
-    !window.location.href.includes('base.org') && 
-    !window.location.href.includes('farcaster.xyz');
+  const isMiniApp = typeof window !== 'undefined' && detectEnvironment() === 'miniapp';
+  const buttonText = isMiniApp ? 'Sign In with Farcaster' : 'Sign In';
   
   return (
     <button
@@ -77,7 +78,7 @@ export function ConnectButton({ className = '', size = 'lg' }: ConnectButtonProp
         ${className}
       `}
     >
-      {isDevelopment ? 'Connect Wallet (Dev)' : 'Sign In with Farcaster'}
+      {buttonText}
     </button>
   );
 }

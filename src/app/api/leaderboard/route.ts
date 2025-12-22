@@ -56,11 +56,21 @@ export async function GET(request: NextRequest) {
             const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
             const identity = await resolveIdentity(score.userId);
             
+            // Determine user type based on identity source and userId format
+            let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+            if (identity.source === 'farcaster') {
+              userType = 'farcaster';
+            } else if (/^0x[a-fA-F0-9]{40}$/i.test(identity.address)) {
+              userType = 'wallet';
+            } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity.address)) {
+              userType = 'privy'; // Privy UUID
+            }
+            
             return {
               rank: index + 1,
               user: {
                 userId: identity.address,
-                userType: identity.source === 'farcaster' ? 'farcaster' : 'wallet',
+                userType,
                 displayName: identity.displayName,
                 avatarUrl: identity.avatarUrl,
               },
