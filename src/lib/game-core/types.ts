@@ -90,7 +90,8 @@ export interface Run {
 export interface LeaderboardEntry {
   rank: number;
   user: User;
-  bestStreak: number;
+  bestStreak: number; // Best single streak
+  cumulativeScore?: number; // Cumulative score for weekly (sum of all streaks)
   usedReprieve: boolean;
   timestamp: number;
 }

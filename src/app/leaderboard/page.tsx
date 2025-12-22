@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { LeaderboardList } from '@/components/leaderboard';
+import { 
+  LeaderboardList, 
+  PrizePoolBanner, 
+  SponsorAdCard, 
+  TopThreePodium,
+  UserRankCard 
+} from '@/components/leaderboard';
 import { LeaderboardEntry } from '@/lib/game-core/types';
 import { useIdentity } from '@/hooks';
 import { trackPageView } from '@/lib/analytics/session';
@@ -16,6 +22,19 @@ export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [prizePool, setPrizePool] = useState<{
+    prizeAmount: number;
+    sponsor?: { companyName: string; tokenSymbol: string; logoUrl?: string };
+    userPrizeEstimate?: number;
+  } | null>(null);
+  const [positionChange, setPositionChange] = useState<{
+    changed: boolean;
+    previousRank: number | null;
+    currentRank: number | null;
+    direction: 'up' | 'down' | null;
+    rankChange: number;
+  } | null>(null);
+  const [userScore, setUserScore] = useState<number>(0);
   const pageStartTime = useRef<number>(Date.now());
   
   // Track page view and journey step
@@ -53,7 +72,55 @@ export default function LeaderboardPage() {
       }
     }
 
+    async function fetchPrizePool() {
+      try {
+        const params = new URLSearchParams();
+        if (userId) params.set('userId', userId);
+        
+        const response = await fetch(`/api/prizepool?${params}`);
+        const data = await response.json();
+        
+        if (data.success && data.prizePool) {
+          setPrizePool({
+            prizeAmount: data.prizePool.prizeAmount || 1000,
+            sponsor: data.sponsor ? {
+              companyName: data.sponsor.companyName,
+              tokenSymbol: data.sponsor.tokenSymbol,
+              logoUrl: data.sponsor.logoUrl,
+            } : undefined,
+            userPrizeEstimate: data.userPrizeEstimate,
+          });
+          setUserScore(data.userScore || 0);
+        }
+      } catch (error) {
+        console.error('Failed to fetch prize pool:', error);
+      }
+    }
+
+    async function fetchPositionChange() {
+      if (!userId || type !== 'weekly') return;
+      
+      try {
+        const response = await fetch('/api/leaderboard/position-change', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, board: 'weekly' }),
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          setPositionChange(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch position change:', error);
+      }
+    }
+
     fetchLeaderboard();
+    if (type === 'weekly') {
+      fetchPrizePool();
+      fetchPositionChange();
+    }
   }, [type, userId]);
 
   return (
@@ -82,7 +149,7 @@ export default function LeaderboardPage() {
               className={`
                 flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors
                 ${type === 'weekly' 
-                  ? 'bg-emerald-600 text-white' 
+                  ? 'bg-violet-600 text-white' 
                   : 'bg-zinc-800 text-zinc-400 hover:text-white'
                 }
               `}
@@ -97,7 +164,7 @@ export default function LeaderboardPage() {
               className={`
                 flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors
                 ${type === 'global' 
-                  ? 'bg-emerald-600 text-white' 
+                  ? 'bg-violet-600 text-white' 
                   : 'bg-zinc-800 text-zinc-400 hover:text-white'
                 }
               `}
@@ -110,16 +177,64 @@ export default function LeaderboardPage() {
 
       {/* Content */}
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6">
+        {type === 'weekly' && prizePool && (
+          <PrizePoolBanner
+            prizeAmount={prizePool.prizeAmount}
+            sponsor={prizePool.sponsor}
+            userRank={userRank}
+            userPrizeEstimate={prizePool.userPrizeEstimate}
+          />
+        )}
+        
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-3 border-violet-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <LeaderboardList
-            entries={entries}
-            userRank={userRank}
-            currentUserId={userId}
-          />
+          <>
+            {/* Top 3 Podium */}
+            {entries.length >= 3 && (
+              <TopThreePodium 
+                entries={entries.slice(0, 3)} 
+                currentUserId={userId}
+              />
+            )}
+            
+            {/* Sponsored Ad Card - After Top 3 */}
+            {type === 'weekly' && prizePool?.sponsor && (
+              <SponsorAdCard
+                sponsor={{
+                  companyName: prizePool.sponsor.companyName,
+                  tokenSymbol: prizePool.sponsor.tokenSymbol,
+                  tokenName: prizePool.sponsor.tokenSymbol,
+                  logoUrl: prizePool.sponsor.logoUrl,
+                }}
+                ctaText="Trade Now"
+                ctaUrl={`https://${prizePool.sponsor.companyName.toLowerCase().replace(/\s+/g, '')}.com`}
+              />
+            )}
+            
+            {/* User Rank Card - If not in top 3 */}
+            {userRank && userRank > 3 && (
+              <UserRankCard
+                rank={userRank}
+                score={type === 'weekly' 
+                  ? (entries.find(e => e.user.userId === userId)?.cumulativeScore || userScore || entries.find(e => e.user.userId === userId)?.bestStreak || 0)
+                  : (entries.find(e => e.user.userId === userId)?.bestStreak || 0)
+                }
+                rankChange={positionChange?.rankChange}
+                direction={positionChange?.direction || null}
+              />
+            )}
+            
+            {/* Rest of Leaderboard */}
+            <LeaderboardList
+              entries={entries}
+              userRank={userRank}
+              currentUserId={userId}
+              showTopThree={true}
+            />
+          </>
         )}
       </main>
 
@@ -130,14 +245,21 @@ export default function LeaderboardPage() {
             href="/"
             className="
               block w-full py-4 text-center rounded-2xl
-              bg-gradient-to-br from-emerald-500 to-emerald-600
+              bg-gradient-to-br from-violet-500 via-purple-600 to-violet-500
               text-white font-bold text-lg
-              shadow-lg shadow-emerald-500/25
-              hover:shadow-emerald-500/40 transition-shadow
+              shadow-lg shadow-violet-500/30
+              hover:shadow-violet-500/50 hover:scale-[1.02]
+              transition-all duration-200
+              relative overflow-hidden
             "
           >
-            Play Now
+            {/* Animated gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+            <span className="relative z-10">Play Now</span>
           </Link>
+          <p className="text-center text-violet-300/60 text-xs mt-2 font-medium">
+            One more win changes everything.
+          </p>
         </div>
       </div>
     </div>

@@ -7,10 +7,35 @@ interface LeaderboardListProps {
   entries: LeaderboardEntry[];
   userRank?: number | null;
   currentUserId?: string;
+  showTopThree?: boolean;
 }
 
-export function LeaderboardList({ entries, userRank, currentUserId }: LeaderboardListProps) {
-  if (entries.length === 0) {
+export function LeaderboardList({ 
+  entries, 
+  userRank, 
+  currentUserId,
+  showTopThree = true 
+}: LeaderboardListProps) {
+  // Filter out guest/anonymous entries on client side as backup
+  const filteredEntries = entries.filter((entry) => {
+    const userId = entry.user.userId;
+    const userType = entry.user.userType;
+    const displayName = entry.user.displayName;
+    
+    // Skip guest users
+    if (userId.startsWith('guest_') || userType === 'anon') {
+      return false;
+    }
+    
+    // Skip if displayName is "Guest" or looks like a full address
+    if (displayName === 'Guest' || (displayName.length === 42 && displayName.startsWith('0x') && !displayName.includes('...'))) {
+      return false;
+    }
+    
+    return true;
+  });
+
+  if (filteredEntries.length === 0) {
     return (
       <div className="text-center py-12">
         <div className="text-4xl mb-4">🏆</div>
@@ -19,25 +44,23 @@ export function LeaderboardList({ entries, userRank, currentUserId }: Leaderboar
     );
   }
 
+  // Separate top 3 from the rest
+  const topThree = showTopThree ? filteredEntries.slice(0, 3) : [];
+  const restOfEntries = showTopThree ? filteredEntries.slice(3) : filteredEntries;
+
   return (
-    <div className="flex flex-col gap-2">
-      {entries.map((entry) => (
-        <LeaderboardRow
-          key={entry.user.userId}
-          entry={entry}
-          isCurrentUser={entry.user.userId === currentUserId}
-        />
-      ))}
-      
-      {/* Show user's rank if not in top list */}
-      {userRank && userRank > entries.length && (
-        <div className="mt-4 pt-4 border-t border-zinc-800">
-          <p className="text-center text-zinc-400 text-sm mb-2">Your rank</p>
-          <div className="px-4 py-3 rounded-xl bg-violet-900/20 border border-violet-700/50">
-            <span className="text-violet-400 font-bold">#{userRank}</span>
-          </div>
-        </div>
-      )}
+    <div className="flex flex-col">
+      {/* Top 3 will be rendered separately by parent */}
+      {/* Rest of entries */}
+      <div className="flex flex-col gap-2">
+        {restOfEntries.map((entry) => (
+          <LeaderboardRow
+            key={entry.user.userId}
+            entry={entry}
+            isCurrentUser={entry.user.userId === currentUserId}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -48,13 +71,6 @@ interface LeaderboardRowProps {
 }
 
 function LeaderboardRow({ entry, isCurrentUser }: LeaderboardRowProps) {
-  const getRankDisplay = (rank: number) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    return `#${rank}`;
-  };
-
   const getStreakEmoji = (streak: number) => {
     if (streak >= 50) return '👑';
     if (streak >= 20) return '🔥🔥🔥';
@@ -66,22 +82,31 @@ function LeaderboardRow({ entry, isCurrentUser }: LeaderboardRowProps) {
   return (
     <div
       className={`
-        flex items-center gap-4 px-4 py-3 rounded-xl
+        flex items-center gap-3 px-4 py-3 rounded-xl
+        transition-all duration-200
         ${isCurrentUser 
-          ? 'bg-violet-900/20 border border-violet-700/50' 
-          : 'bg-zinc-900/50 border border-zinc-800'
+          ? 'bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-700/50 shadow-lg shadow-blue-500/10' 
+          : 'bg-zinc-900/40 border border-zinc-800/50 hover:bg-zinc-800/50'
         }
       `}
     >
-      {/* Rank */}
-      <div className="w-10 text-center">
-        <span className={`font-bold ${entry.rank <= 3 ? 'text-2xl' : 'text-zinc-400'}`}>
-          {getRankDisplay(entry.rank)}
-        </span>
+      {/* Rank Badge */}
+      <div className="w-12 text-center shrink-0">
+        <div className={`
+          inline-flex items-center justify-center w-10 h-10 rounded-full
+          ${entry.rank <= 10 
+            ? 'bg-gradient-to-br from-violet-500/20 to-purple-600/20 border border-violet-500/50' 
+            : 'bg-zinc-800/50 border border-zinc-700/50'
+          }
+        `}>
+          <span className={`font-bold text-sm ${entry.rank <= 10 ? 'text-violet-300' : 'text-zinc-400'}`}>
+            #{entry.rank}
+          </span>
+        </div>
       </div>
 
       {/* Avatar */}
-      <div className="relative w-10 h-10 rounded-full overflow-hidden bg-zinc-800">
+      <div className="relative w-10 h-10 rounded-full overflow-hidden bg-zinc-800 border-2 border-zinc-700 shrink-0">
         {entry.user.avatarUrl ? (
           <Image
             src={entry.user.avatarUrl}
@@ -90,15 +115,15 @@ function LeaderboardRow({ entry, isCurrentUser }: LeaderboardRowProps) {
             className="object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-lg">
+          <div className="w-full h-full flex items-center justify-center text-lg font-bold text-white">
             {entry.user.displayName.charAt(0).toUpperCase()}
           </div>
         )}
       </div>
 
-      {/* Name */}
+      {/* Name and Info */}
       <div className="flex-1 min-w-0">
-        <p className={`font-medium truncate ${isCurrentUser ? 'text-violet-300' : 'text-white'}`}>
+        <p className={`font-medium truncate ${isCurrentUser ? 'text-blue-200' : 'text-white'}`}>
           {entry.user.displayName}
         </p>
         {entry.usedReprieve && (
@@ -106,18 +131,25 @@ function LeaderboardRow({ entry, isCurrentUser }: LeaderboardRowProps) {
         )}
       </div>
 
-      {/* Streak */}
-      <div className="text-right">
-        <span className="text-xl font-bold text-emerald-400 tabular-nums">
-          {entry.bestStreak}
-        </span>
+      {/* Score */}
+      <div className="text-right shrink-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-lg font-bold text-white tabular-nums">
+            {entry.cumulativeScore !== undefined ? entry.cumulativeScore : entry.bestStreak}
+          </span>
+        </div>
         {getStreakEmoji(entry.bestStreak) && (
-          <span className="ml-1">{getStreakEmoji(entry.bestStreak)}</span>
+          <div className="text-xs mt-0.5 text-amber-400">
+            {getStreakEmoji(entry.bestStreak)}
+          </div>
         )}
       </div>
     </div>
   );
 }
+
+
+
 
 
 

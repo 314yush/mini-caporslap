@@ -126,6 +126,9 @@ const KEYS = {
   userBestStreak: (userId: string) => `user:${userId}:best`,
   userProfile: (userId: string) => `user:${userId}:profile`,
   runData: (runId: string) => `run:${runId}`,
+  // Weekly cumulative score tracking
+  weeklyCumulativeScores: () => `scores:weekly:${getWeekKey()}:cumulative`,
+  userWeeklyStats: (userId: string) => `user:${userId}:weekly:${getWeekKey()}`,
 };
 
 /**
@@ -300,6 +303,152 @@ export async function getUserBestStreak(userId: string): Promise<number> {
 }
 
 /**
+ * Tracks cumulative weekly score (sum of all streaks in the week)
+ * @param userId - User ID
+ * @param streak - Streak to add to cumulative score
+ * @returns Updated cumulative score
+ */
+export async function trackWeeklyScore(userId: string, streak: number): Promise<number> {
+  const client = getRedis();
+  if (!client) return 0;
+  
+  try {
+    const weekKey = getWeekKey();
+    const statsKey = KEYS.userWeeklyStats(userId);
+    const scoresKey = KEYS.weeklyCumulativeScores();
+    
+    // Get current stats
+    const statsJson = await client.get(statsKey);
+    let stats: {
+      cumulativeScore: number;
+      bestStreak: number;
+      runCount: number;
+      lastUpdated: number;
+    };
+    
+    if (statsJson) {
+      stats = typeof statsJson === 'string' ? JSON.parse(statsJson) : statsJson;
+    } else {
+      stats = {
+        cumulativeScore: 0,
+        bestStreak: 0,
+        runCount: 0,
+        lastUpdated: Date.now(),
+      };
+    }
+    
+    // Update stats
+    stats.cumulativeScore += streak;
+    stats.bestStreak = Math.max(stats.bestStreak, streak);
+    stats.runCount += 1;
+    stats.lastUpdated = Date.now();
+    
+    // Store updated stats
+    await client.set(statsKey, JSON.stringify(stats), { ex: 60 * 60 * 24 * 8 }); // 8 days TTL
+    
+    // Update sorted set for leaderboard (score = cumulative score)
+    await client.zadd(scoresKey, {
+      score: stats.cumulativeScore,
+      member: userId,
+    });
+    
+    // Set TTL on sorted set (8 days)
+    await client.expire(scoresKey, 60 * 60 * 24 * 8);
+    
+    return stats.cumulativeScore;
+  } catch (error) {
+    console.error('Error tracking weekly score:', error);
+    return 0;
+  }
+}
+
+/**
+ * Gets a user's weekly cumulative score
+ * @param userId - User ID
+ * @returns Cumulative score for current week
+ */
+export async function getUserWeeklyScore(userId: string): Promise<number> {
+  const client = getRedis();
+  if (!client) return 0;
+  
+  try {
+    const statsKey = KEYS.userWeeklyStats(userId);
+    const statsJson = await client.get(statsKey);
+    
+    if (!statsJson) return 0;
+    
+    const stats = typeof statsJson === 'string' ? JSON.parse(statsJson) : statsJson;
+    return stats.cumulativeScore || 0;
+  } catch (error) {
+    console.error('Error fetching user weekly score:', error);
+    return 0;
+  }
+}
+
+/**
+ * Gets weekly cumulative scores leaderboard
+ * @param limit - Max entries to return
+ * @returns Array of entries with cumulative scores
+ */
+export async function getWeeklyCumulativeScores(limit: number = 100): Promise<Array<{
+  userId: string;
+  cumulativeScore: number;
+  bestStreak: number;
+  runCount: number;
+}>> {
+  const client = getRedis();
+  if (!client) return [];
+  
+  try {
+    const scoresKey = KEYS.weeklyCumulativeScores();
+    
+    // Get top scores (descending)
+    const results = await client.zrange<string[]>(scoresKey, 0, limit - 1, {
+      rev: true,
+      withScores: true,
+    });
+    
+    const entries: Array<{
+      userId: string;
+      cumulativeScore: number;
+      bestStreak: number;
+      runCount: number;
+    }> = [];
+    
+    // Results come in pairs: [member, score, member, score, ...]
+    for (let i = 0; i < results.length; i += 2) {
+      const userId = results[i];
+      const cumulativeScore = parseInt(results[i + 1], 10);
+      
+      // Get detailed stats
+      const statsKey = KEYS.userWeeklyStats(userId);
+      const statsJson = await client.get(statsKey);
+      
+      let bestStreak = 0;
+      let runCount = 0;
+      
+      if (statsJson) {
+        const stats = typeof statsJson === 'string' ? JSON.parse(statsJson) : statsJson;
+        bestStreak = stats.bestStreak || 0;
+        runCount = stats.runCount || 0;
+      }
+      
+      entries.push({
+        userId,
+        cumulativeScore,
+        bestStreak,
+        runCount,
+      });
+    }
+    
+    return entries;
+  } catch (error) {
+    console.error('Error fetching weekly cumulative scores:', error);
+    return [];
+  }
+}
+
+/**
  * Formats raw Redis results into LeaderboardEntry array
  */
 async function formatLeaderboardResults(results: string[]): Promise<LeaderboardEntry[]> {
@@ -421,6 +570,23 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
           }
         } else {
           user = { userId, userType: 'anon', displayName: 'Guest' };
+        }
+      }
+      
+      // Filter out guest/anonymous users from leaderboard
+      // Skip entries where userId starts with 'guest_' or userType is 'anon'
+      if (userId.startsWith('guest_') || user.userType === 'anon') {
+        continue; // Skip this entry
+      }
+      
+      // Ensure displayName is properly formatted (never show "Guest" or full address)
+      if (user.displayName === 'Guest' || (!user.displayName.includes('.') && user.displayName.length === 42 && user.displayName.startsWith('0x'))) {
+        // If still showing as Guest or full address, try to truncate
+        if (/^0x[a-fA-F0-9]{40}$/.test(user.userId)) {
+          user.displayName = truncateAddress(user.userId);
+        } else {
+          // Skip if we can't properly display
+          continue;
         }
       }
       

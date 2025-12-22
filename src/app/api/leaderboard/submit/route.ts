@@ -4,6 +4,7 @@ import { requiresVerification, validateGameState, ServerGameState } from '@/lib/
 import { submitScoreWithOvertakes, OvertakeEvent } from '@/lib/leaderboard/overtake';
 import { resolveIdentity, ResolvedIdentity } from '@/lib/auth/identity-resolver';
 import { getRedis } from '@/lib/redis';
+import { updatePreviousRank } from '@/lib/leaderboard/position-tracker';
 
 /**
  * POST /api/leaderboard/submit
@@ -93,6 +94,23 @@ export async function POST(request: NextRequest) {
     if (redis) {
       // Use real Redis
       result = await submitScoreWithOvertakes(redis, userId, run.streak, userIdentity);
+      
+      // Track cumulative weekly score (Phase 0: Score tracking backend)
+      const { trackWeeklyScore } = await import('@/lib/redis');
+      await trackWeeklyScore(userId, run.streak).catch((error) => {
+        console.error('Error tracking weekly score:', error);
+        // Don't fail the request if score tracking fails
+      });
+      
+      // Update previous rank for position change tracking (Phase 1)
+      if (result.newRank > 0) {
+        await updatePreviousRank(userId, 'weekly', result.newRank).catch((error) => {
+          console.error('Error updating previous rank:', error);
+        });
+        await updatePreviousRank(userId, 'global', result.newRank).catch((error) => {
+          console.error('Error updating previous rank:', error);
+        });
+      }
     } else {
       // Redis not configured - return empty result
       result = {
