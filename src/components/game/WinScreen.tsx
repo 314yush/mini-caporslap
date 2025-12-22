@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import confetti from 'canvas-confetti';
 import { Run } from '@/lib/game-core/types';
 import { generateWinShareData, generateShareText, shareToClipboard } from '@/lib/social/sharing';
 import { miniAppComposeCast } from '@/lib/farcaster/sdk';
@@ -25,8 +26,42 @@ export function WinScreen({
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   
-  // Delay showing actions for dramatic effect
+  // Trigger confetti animation on mount
   useEffect(() => {
+    // Initial burst
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+
+    // Rain effect for 2 seconds
+    const end = Date.now() + 2000;
+    const colors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0']; // Emerald/green colors
+
+    const frame = () => {
+      confetti({
+        particleCount: 2,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors: colors
+      });
+      confetti({
+        particleCount: 2,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors: colors
+      });
+
+      if (Date.now() < end) {
+        requestAnimationFrame(frame);
+      }
+    };
+    frame();
+
+    // Delay showing actions for dramatic effect
     const timer = setTimeout(() => setShowActions(true), 300);
     return () => clearTimeout(timer);
   }, []);
