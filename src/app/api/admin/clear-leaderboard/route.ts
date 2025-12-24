@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
       // Clear user profiles - get all user IDs from leaderboards first
       const userIds = new Set<string>();
 
-      // Get user IDs from global leaderboard
-      if (type === 'all' || type === 'global') {
+      // Get user IDs from global leaderboard (only if type is 'all', since 'profiles' doesn't need leaderboard data)
+      if (type === 'all') {
         try {
           const globalEntries = await redis.zrange('leaderboard:global', 0, 1000, { rev: true });
           for (const entry of globalEntries) {
@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Get user IDs from weekly leaderboard
-      if (type === 'all' || type === 'weekly') {
+      // Get user IDs from weekly leaderboard (only if type is 'all')
+      if (type === 'all') {
         try {
           const weekKey = getWeekKey();
           const weeklyKey = `leaderboard:weekly:${weekKey}`;
