@@ -455,14 +455,22 @@ export async function getWeeklyCumulativeScores(limit: number = 100): Promise<Ar
 
 /**
  * Formats raw Redis results into LeaderboardEntry array
+ * 
+ * Ensures all wallet addresses get their ENS/Farcaster names resolved:
+ * - For wallet addresses (0x...), always attempts to resolve ENS/Farcaster names
+ * - Re-resolves cached entries if they have truncated addresses or if source is 'address'
+ * - Falls back to truncated address only if ENS/Farcaster resolution fails
+ * - For FIDs (numeric), resolves to Farcaster usernames
  */
 async function formatLeaderboardResults(results: string[]): Promise<LeaderboardEntry[]> {
   const client = getRedis();
   if (!client || results.length === 0) return [];
   
   const entries: LeaderboardEntry[] = [];
+  const userIdsToResolve: string[] = [];
+  const userIdMap = new Map<string, { member: { userId: string; usedReprieve?: boolean; timestamp?: number }; score: number; index: number }>();
   
-  // Results come in pairs: [member, score, member, score, ...]
+  // First pass: collect all user IDs and check cache
   for (let i = 0; i < results.length; i += 2) {
     const memberStr = results[i];
     const score = parseInt(results[i + 1], 10);
@@ -532,30 +540,105 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
             }
           } else {
             // Already resolved (ENS, Farcaster, etc.) - use stored data
-            // Determine user type from stored data
-            let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
-            if (parsed.source === 'farcaster') {
-              userType = 'farcaster';
-            } else if (/^0x[a-fA-F0-9]{40}$/i.test(parsed.address)) {
-              userType = 'wallet';
-            } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.address)) {
-              userType = 'privy';
+            // But for wallet addresses, always re-check in case ENS/Farcaster was added
+            const isWalletAddress = /^0x[a-fA-F0-9]{40}$/i.test(parsed.address);
+            const hasTruncatedName = parsed.displayName && (
+              parsed.displayName.includes('...') || 
+              parsed.displayName.length < 10 ||
+              /^0x[a-fA-F0-9]{4}\.\.\.[a-fA-F0-9]{4}$/i.test(parsed.displayName) // Matches "0x1234...5678" pattern
+            );
+            
+            // Always re-resolve wallet addresses if:
+            // 1. They have truncated names (includes "..." pattern)
+            // 2. Source is 'address' (means previous resolution failed)
+            // 3. Source is 'wallet' (might have ENS/Farcaster now)
+            // 4. Display name looks like a truncated address
+            if (isWalletAddress && (hasTruncatedName || parsed.source === 'wallet' || parsed.source === 'address')) {
+              try {
+                const { resolveIdentity, clearIdentityCacheFor } = await import('@/lib/auth/identity-resolver');
+                // Clear in-memory cache to force fresh resolution
+                clearIdentityCacheFor(parsed.address);
+                const identity = await resolveIdentity(parsed.address);
+                // Only update if we got a better resolution (ENS, Farcaster, or Basename)
+                if (identity.source !== 'address' && identity.displayName !== parsed.displayName) {
+                  let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+                  if (identity.source === 'farcaster') {
+                    userType = 'farcaster';
+                  } else if (/^0x[a-fA-F0-9]{40}$/i.test(identity.address)) {
+                    userType = 'wallet';
+                  } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity.address)) {
+                    userType = 'privy';
+                  }
+                  user = {
+                    userId: identity.address,
+                    userType,
+                    displayName: identity.displayName,
+                    avatarUrl: identity.avatarUrl || parsed.avatarUrl,
+                  };
+                  // Update cache with better resolution
+                  await client.set(KEYS.userProfile(userId), JSON.stringify(identity), { ex: 86400 * 7 });
+                } else {
+                  // Use existing cached data
+                  let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+                  if (parsed.source === 'farcaster') {
+                    userType = 'farcaster';
+                  } else if (/^0x[a-fA-F0-9]{40}$/i.test(parsed.address)) {
+                    userType = 'wallet';
+                  } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.address)) {
+                    userType = 'privy';
+                  }
+                  user = {
+                    userId: parsed.address,
+                    userType,
+                    displayName: parsed.displayName,
+                    avatarUrl: parsed.avatarUrl,
+                  };
+                }
+              } catch {
+                // If resolution fails, use cached data
+                let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+                if (parsed.source === 'farcaster') {
+                  userType = 'farcaster';
+                } else if (/^0x[a-fA-F0-9]{40}$/i.test(parsed.address)) {
+                  userType = 'wallet';
+                } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.address)) {
+                  userType = 'privy';
+                }
+                user = {
+                  userId: parsed.address,
+                  userType,
+                  displayName: parsed.displayName,
+                  avatarUrl: parsed.avatarUrl,
+                };
+              }
+            } else {
+              // Already has good resolution (ENS, Farcaster, etc.) - use stored data
+              let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
+              if (parsed.source === 'farcaster') {
+                userType = 'farcaster';
+              } else if (/^0x[a-fA-F0-9]{40}$/i.test(parsed.address)) {
+                userType = 'wallet';
+              } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.address)) {
+                userType = 'privy';
+              }
+              user = {
+                userId: parsed.address,
+                userType,
+                displayName: parsed.displayName,
+                avatarUrl: parsed.avatarUrl,
+              };
             }
-            user = {
-              userId: parsed.address,
-              userType,
-              displayName: parsed.displayName,
-              avatarUrl: parsed.avatarUrl,
-            };
           }
         } else {
           // It's already in User format
           user = parsed as User;
           // If userId is an Ethereum address but displayName is truncated, try to resolve ENS
           if (/^0x[a-fA-F0-9]{40}$/.test(user.userId) && 
-              (user.displayName.includes('...') || user.displayName.length < 10)) {
+              (user.displayName.includes('...') || user.displayName.length < 10 || /^0x[a-fA-F0-9]{4}\.\.\.[a-fA-F0-9]{4}$/i.test(user.displayName))) {
             try {
-              const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
+              const { resolveIdentity, clearIdentityCacheFor } = await import('@/lib/auth/identity-resolver');
+              // Clear in-memory cache to force fresh resolution
+              clearIdentityCacheFor(user.userId);
               const identity = await resolveIdentity(user.userId);
               // Determine user type
               let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
@@ -584,14 +667,19 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
         }
       } else {
         // No profile found - try to resolve identity
-        // Check if it's an Ethereum address, FID (numeric), or other format
+        // Check if it's an Ethereum address, FID (numeric), Privy UUID, or other format
         const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(userId);
         const isFID = /^\d+$/.test(userId);
+        const isPrivyUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
         
         if (isEthereumAddress || isFID) {
           // Import resolveIdentity dynamically to avoid circular dependency
-          const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
+          const { resolveIdentity, clearIdentityCacheFor } = await import('@/lib/auth/identity-resolver');
           try {
+            // For wallet addresses, clear cache to ensure fresh resolution
+            if (isEthereumAddress) {
+              clearIdentityCacheFor(userId);
+            }
             const identity = await resolveIdentity(userId);
             // Determine user type
             let userType: 'farcaster' | 'wallet' | 'privy' | 'anon' = 'anon';
@@ -618,6 +706,14 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
               user = { userId, userType: 'anon', displayName: truncateAddress(userId) };
             }
           }
+        } else if (isPrivyUUID) {
+          // For Privy UUIDs, we can't resolve to ENS/Farcaster, but we can show a better format
+          // Note: Ideally, Privy users should use wallet addresses as userId when available
+          user = {
+            userId,
+            userType: 'privy',
+            displayName: truncateAddress(userId), // Show as "31406d56...c4aa"
+          };
         } else {
           user = { userId, userType: 'anon', displayName: 'Guest' };
         }
@@ -631,10 +727,14 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
       
       // Detect and fix bad truncation patterns (e.g., "3626...3626" for FIDs)
       // This happens when truncateAddress is called on short numeric strings
-      if (user.displayName && /^(\d+\.\.\.\1)$/.test(user.displayName)) {
-        // Bad pattern detected - this is a truncated FID, re-resolve it
-        const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
+      // Also check for truncated wallet addresses (0x1234...5678 pattern)
+      const isTruncatedAddress = /^0x[a-fA-F0-9]{4}\.\.\.[a-fA-F0-9]{4}$/i.test(user.displayName || '');
+      if (user.displayName && (/^(\d+\.\.\.\1)$/.test(user.displayName) || isTruncatedAddress)) {
+        // Bad pattern detected - re-resolve it
+        const { resolveIdentity, clearIdentityCacheFor } = await import('@/lib/auth/identity-resolver');
         try {
+          // Clear cache to force fresh resolution
+          clearIdentityCacheFor(user.userId);
           const identity = await resolveIdentity(user.userId);
           user.displayName = identity.displayName;
           user.avatarUrl = identity.avatarUrl;
@@ -649,14 +749,36 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
       }
       
       // Ensure displayName is properly formatted (never show "Guest" or full address)
-      if (user.displayName === 'Guest' || (!user.displayName.includes('.') && user.displayName.length === 42 && user.displayName.startsWith('0x'))) {
-        // If still showing as Guest or full address, try to truncate
+      // Also check for truncated addresses that should be re-resolved
+      const isTruncatedWallet = /^0x[a-fA-F0-9]{4}\.\.\.[a-fA-F0-9]{4}$/i.test(user.displayName || '');
+      if (user.displayName === 'Guest' || 
+          (!user.displayName.includes('.') && user.displayName.length === 42 && user.displayName.startsWith('0x')) ||
+          (isTruncatedWallet && /^0x[a-fA-F0-9]{40}$/.test(user.userId))) {
+        // If still showing as Guest, full address, or truncated address, try to resolve
         if (/^0x[a-fA-F0-9]{40}$/.test(user.userId)) {
-          user.displayName = truncateAddress(user.userId);
+          // For wallet addresses, try to resolve ENS/Farcaster one more time
+          const { resolveIdentity, clearIdentityCacheFor } = await import('@/lib/auth/identity-resolver');
+          try {
+            clearIdentityCacheFor(user.userId);
+            const identity = await resolveIdentity(user.userId);
+            // Only update if we got a better resolution
+            if (identity.source !== 'address') {
+              user.displayName = identity.displayName;
+              user.avatarUrl = identity.avatarUrl || user.avatarUrl;
+              // Update cache
+              await client.set(KEYS.userProfile(user.userId), JSON.stringify(identity), { ex: 86400 * 7 });
+            } else {
+              // Fallback to truncated if resolution still fails
+              user.displayName = truncateAddress(user.userId);
+            }
+          } catch {
+            user.displayName = truncateAddress(user.userId);
+          }
         } else if (/^\d+$/.test(user.userId)) {
           // For FIDs, try to resolve username
-          const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
+          const { resolveIdentity, clearIdentityCacheFor } = await import('@/lib/auth/identity-resolver');
           try {
+            clearIdentityCacheFor(user.userId);
             const identity = await resolveIdentity(user.userId);
             user.displayName = identity.displayName;
             user.avatarUrl = identity.avatarUrl;

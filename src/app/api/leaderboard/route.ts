@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
             }
             
             // If no entry found, resolve identity and create entry
+            // resolveIdentity will attempt to resolve ENS/Farcaster names for wallet addresses
+            // Priority: Farcaster username > ENS > Basename > Truncated address
             const { resolveIdentity } = await import('@/lib/auth/identity-resolver');
             const identity = await resolveIdentity(score.userId);
             

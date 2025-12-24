@@ -30,14 +30,14 @@ export const metadata: Metadata = {
     'base:app_id': '694491c9d77c069a945be088',
     'fc:miniapp': JSON.stringify({
       version: 'next',
-      imageUrl: 'https://mini.caporslap.fun/images/miniapp/hero-1200x630.png',
+      imageUrl: 'https://caporslap.fun/images/miniapp/hero-1200x630.png',
       button: {
         title: 'Play Now',
         action: {
           type: 'launch_miniapp',
           name: 'CapOrSlap',
-          url: 'https://mini.caporslap.fun',
-          splashImageUrl: 'https://mini.caporslap.fun/images/miniapp/splash-1200.png',
+          url: 'https://caporslap.fun',
+          splashImageUrl: 'https://caporslap.fun/images/miniapp/splash-1200.png',
           splashBackgroundColor: '#09090b',
         },
       },
@@ -47,13 +47,13 @@ export const metadata: Metadata = {
     title: 'CapOrSlap',
     description: 'Can you guess the market cap? Play now!',
     type: 'website',
-    images: ['https://mini.caporslap.fun/images/miniapp/hero-1200x630.png'],
+    images: ['https://caporslap.fun/images/miniapp/hero-1200x630.png'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'CapOrSlap',
     description: 'Can you guess the market cap? Play now!',
-    images: ['https://mini.caporslap.fun/images/miniapp/hero-1200x630.png'],
+    images: ['https://caporslap.fun/images/miniapp/hero-1200x630.png'],
   },
 };
 

@@ -21,7 +21,7 @@ export function ShareButton({ streak, className = '', children }: ShareButtonPro
   const handleShare = async () => {
     setSharing(true);
     const shareText = getSharePreview(streak);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mini.caporslap.fun';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://caporslap.fun';
     
     // Track share analytics
     trackSocialShare('farcaster', streak, 'loss');
@@ -60,6 +60,9 @@ export function ShareButton({ streak, className = '', children }: ShareButtonPro
     </button>
   );
 }
+
+
+
 
 
 

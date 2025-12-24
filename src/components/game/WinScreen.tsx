@@ -74,7 +74,7 @@ export function WinScreen({
     trackShareInSession();
     
     const shareData = generateWinShareData(run, winType, rank);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mini.caporslap.fun';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://caporslap.fun';
     
     // Try composeCast first (native Mini App share)
     const shareText = `${shareData.message}\n\nCan you beat me?`;
@@ -201,3 +201,6 @@ export function WinScreen({
     </div>
   );
 }
+
+
+

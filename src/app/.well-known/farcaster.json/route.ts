@@ -15,7 +15,7 @@ function getAppUrl(): string {
   const raw =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.NEXT_PUBLIC_URL ||
-    'https://mini.caporslap.fun';
+    'https://caporslap.fun';
   return raw.replace(/\/$/, '');
 }
 
@@ -39,7 +39,7 @@ export async function GET() {
       version: '1',
       name: 'CapOrSlap',
       homeUrl: appUrl,
-      iconUrl: `${appUrl}/android-chrome-512x512.png`,
+      iconUrl: `${appUrl}/images/miniapp/icon-512.png`,
       
       // Required: Loading Experience
       splashImageUrl: `${appUrl}/images/miniapp/splash-1200.png`,
@@ -55,7 +55,7 @@ export async function GET() {
         'game',          // Game type
         'trading',       // Trading/guessing aspect
         'leaderboard',   // Competitive feature
-        'defi',          // DeFi/crypto focus
+        '314yush',       // Creator username
       ],
       
       // Required: Display Information
@@ -75,7 +75,7 @@ export async function GET() {
       // These help with search and discovery
       subtitle: 'Higher or lower for crypto',
       // Description should be keyword-rich for search indexing
-      description: 'Guess if crypto tokens have higher or lower market caps. Build streaks, compete on leaderboards, and test your crypto knowledge. Play the ultimate higher or lower game for cryptocurrency market caps.',
+      description: 'Guess if crypto tokens have higher or lower market caps. Build streaks, compete on leaderboards, and test your crypto knowledge. Built by 314yush.',
       
       // Optional: Embeds & Social Sharing
       // These appear when sharing the app URL in DMs or feeds
@@ -92,5 +92,10 @@ export async function GET() {
     }),
   };
 
-  return Response.json(manifest);
+  return Response.json(manifest, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+    },
+  });
 }

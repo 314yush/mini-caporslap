@@ -53,3 +53,5 @@ export function UserRankCard({ rank, score, rankChange, direction }: UserRankCar
 }
 
 
+
+

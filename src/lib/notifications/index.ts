@@ -134,7 +134,7 @@ export async function sendNotification({
     return { state: 'no_token' };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mini.caporslap.fun';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://caporslap.fun';
 
   try {
     const response = await fetch(notificationDetails.url, {
@@ -279,6 +279,9 @@ export async function sendPrizePoolRankNotification(
     console.log('[Notifications] Prize pool rank notification result:', result);
   }
 }
+
+
+
 
 
 

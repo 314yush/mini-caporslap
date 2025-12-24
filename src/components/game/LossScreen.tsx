@@ -101,7 +101,7 @@ export function LossScreen({
     trackShareInSession();
     
     const shareData = generateShareData(run);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mini.caporslap.fun';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://caporslap.fun';
     
     // Try composeCast first (native Mini App share)
     const shareText = `${shareData.message}\n\nCan you beat me?`;

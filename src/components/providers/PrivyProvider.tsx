@@ -34,3 +34,5 @@ export function PrivyProvider({ children }: PrivyProviderProps) {
     </PrivyProviderBase>
   );
 }
+
+

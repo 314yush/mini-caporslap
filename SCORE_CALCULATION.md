@@ -79,3 +79,5 @@ The weekly prize pool is distributed based on **cumulative scores**:
    - Global: Shows `bestStreak`
 
 
+
+
