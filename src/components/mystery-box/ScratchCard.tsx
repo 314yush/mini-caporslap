@@ -111,10 +111,9 @@ export function ScratchCard({ onReveal, revealed, children }: ScratchCardProps) 
       return;
     }
     
-    // Get context - use stored one or get fresh
-    let ctx = ctxRef.current;
-    if (!ctx) {
-      ctx = canvas.getContext('2d', { willReadFrequently: true });
+    // Ensure context is available
+    if (!ctxRef.current) {
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) {
         if (process.env.NODE_ENV === 'development') {
           console.log('[ScratchCard] No context for progress check');
@@ -131,6 +130,9 @@ export function ScratchCard({ onReveal, revealed, children }: ScratchCardProps) 
       }
       return;
     }
+    
+    // Access context directly from ref to avoid immutability issues
+    const ctx = ctxRef.current;
     
     // Read imageData from the full canvas (includes DPR scaling)
     try {
@@ -182,10 +184,9 @@ export function ScratchCard({ onReveal, revealed, children }: ScratchCardProps) 
       const canvas = canvasRef.current;
       if (!canvas) return;
       
-      // Use stored context or get new one
-      let ctx = ctxRef.current;
-      if (!ctx) {
-        ctx = canvas.getContext('2d', { willReadFrequently: true });
+      // Ensure context is available
+      if (!ctxRef.current) {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) return;
         ctxRef.current = ctx;
       }
@@ -203,8 +204,12 @@ export function ScratchCard({ onReveal, revealed, children }: ScratchCardProps) 
         return;
       }
 
+      // Access context directly from ref each time to avoid immutability issues
+      // Don't store in variable - access ctxRef.current directly
+      if (!ctxRef.current) return;
+      
       // Use composite operation to "erase" the scratch layer
-      ctx.globalCompositeOperation = 'destination-out';
+      ctxRef.current.globalCompositeOperation = 'destination-out';
       
       // Draw smooth line between last point and current point for better UX
       if (lastPointRef.current) {
@@ -219,23 +224,23 @@ export function ScratchCard({ onReveal, revealed, children }: ScratchCardProps) 
             const t = i / steps;
             const px = lastX + (x - lastX) * t;
             const py = lastY + (y - lastY) * t;
-            ctx.beginPath();
-            ctx.arc(px, py, scratchRadius, 0, Math.PI * 2);
-            ctx.fill();
+            ctxRef.current.beginPath();
+            ctxRef.current.arc(px, py, scratchRadius, 0, Math.PI * 2);
+            ctxRef.current.fill();
           }
         }
       } else {
         // First point - just draw a circle
-        ctx.beginPath();
-        ctx.arc(x, y, scratchRadius, 0, Math.PI * 2);
-        ctx.fill();
+        ctxRef.current.beginPath();
+        ctxRef.current.arc(x, y, scratchRadius, 0, Math.PI * 2);
+        ctxRef.current.fill();
       }
       
       // Store current point for next draw
       lastPointRef.current = { x, y };
       
       // Reset composite operation for next draw
-      ctx.globalCompositeOperation = 'source-over';
+      ctxRef.current.globalCompositeOperation = 'source-over';
       
       // Force immediate progress check on first scratch to verify it's working
       if (progressCheckRef.current === 0) {
