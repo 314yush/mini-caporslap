@@ -1,299 +1,149 @@
 /**
- * Prize Pool System
- * Manages weekly prize pools, scoring, and distribution
+ * Weekly Prizepool System
+ * Manages prize pool distribution for weekly leaderboard (currently disabled)
  */
 
-import { getRedis } from '../redis';
+import { getFeatureFlags } from '@/lib/feature-flags';
 
-// Redis key patterns
-const KEYS = {
-  prizePoolConfig: (weekKey: string) => `prizepool:weekly:${weekKey}`,
-  prizePoolScores: (weekKey: string) => `prizepool:weekly:${weekKey}:scores`,
-  prizePoolSponsor: (weekKey: string) => `prizepool:weekly:${weekKey}:sponsor`,
-  prizePoolHistory: (weekKey: string) => `prizepool:history:${weekKey}`,
+export interface PrizepoolConfig {
+  enabled: boolean;
+  totalAmount: number; // USDC amount
+  distribution: Array<{ rank: number; percentage: number }>; // Top 25 distribution
+}
+
+export interface PrizeAmount {
+  rank: number;
+  amount: number; // USDC amount
+  percentage: number;
+}
+
+/**
+ * Default prizepool configuration (disabled)
+ * Top 25 players eligible for prizes
+ * Percentage-based distribution
+ */
+const DEFAULT_PRIZEPOOL: PrizepoolConfig = {
+  enabled: false, // Disabled for now
+  totalAmount: 0,
+  distribution: [
+    { rank: 1, percentage: 0.30 },   // 30%
+    { rank: 2, percentage: 0.20 },   // 20%
+    { rank: 3, percentage: 0.15 },    // 15%
+    { rank: 4, percentage: 0.08 },   // 8%
+    { rank: 5, percentage: 0.05 },   // 5%
+    { rank: 6, percentage: 0.04 },   // 4%
+    { rank: 7, percentage: 0.03 },    // 3%
+    { rank: 8, percentage: 0.03 },    // 3%
+    { rank: 9, percentage: 0.02 },   // 2%
+    { rank: 10, percentage: 0.02 },   // 2%
+    { rank: 11, percentage: 0.015 }, // 1.5%
+    { rank: 12, percentage: 0.015 }, // 1.5%
+    { rank: 13, percentage: 0.015 }, // 1.5%
+    { rank: 14, percentage: 0.015 }, // 1.5%
+    { rank: 15, percentage: 0.01 },  // 1%
+    { rank: 16, percentage: 0.01 },  // 1%
+    { rank: 17, percentage: 0.01 },   // 1%
+    { rank: 18, percentage: 0.01 },   // 1%
+    { rank: 19, percentage: 0.01 },   // 1%
+    { rank: 20, percentage: 0.01 },   // 1%
+    { rank: 21, percentage: 0.005 },  // 0.5%
+    { rank: 22, percentage: 0.005 },  // 0.5%
+    { rank: 23, percentage: 0.005 },  // 0.5%
+    { rank: 24, percentage: 0.005 },  // 0.5%
+    { rank: 25, percentage: 0.005 },  // 0.5%
+  ],
 };
 
 /**
- * Gets the current week key (YYYY-WW format)
+ * Gets the current prizepool configuration
+ * Checks feature flag to determine if enabled
+ * @returns Prizepool configuration
  */
-export function getCurrentWeekKey(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const startOfYear = new Date(year, 0, 1);
-  const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
-  const week = Math.ceil((days + startOfYear.getDay() + 1) / 7);
-  return `${year}-${week.toString().padStart(2, '0')}`;
-}
-
-/**
- * Gets week bounds (start and end timestamps)
- */
-export function getWeekBounds(weekKey: string): { startDate: number; endDate: number } {
-  const [year, week] = weekKey.split('-').map(Number);
-  const startOfYear = new Date(year, 0, 1);
-  const daysToAdd = (week - 1) * 7 - startOfYear.getDay();
-  const weekStart = new Date(startOfYear);
-  weekStart.setDate(startOfYear.getDate() + daysToAdd);
-  weekStart.setHours(0, 0, 0, 0);
-  
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 7);
-  weekEnd.setMilliseconds(weekEnd.getMilliseconds() - 1);
+export function getPrizepoolConfig(): PrizepoolConfig {
+  // Check feature flag (to be added to feature flags)
+  // For now, always return disabled config
+  const flags = getFeatureFlags();
+  // Future: check flags.prizepool or similar
   
   return {
-    startDate: weekStart.getTime(),
-    endDate: weekEnd.getTime(),
-  };
-}
-
-// Types
-export interface PrizePoolConfig {
-  weekKey: string;
-  prizeAmount: number;
-  startDate: number;
-  endDate: number;
-  sponsor?: SponsorInfo;
-  status: 'active' | 'completed' | 'pending';
-}
-
-export interface SponsorInfo {
-  tokenAddress: string;
-  tokenSymbol: string;
-  tokenName: string;
-  logoUrl?: string;
-  companyName: string;
-  reprievePrice: number;
-}
-
-export interface WeeklyScore {
-  userId: string;
-  cumulativeScore: number;
-  bestStreak: number;
-  runCount: number;
-  lastUpdated: number;
-}
-
-/**
- * Gets current prize pool config
- */
-export async function getCurrentPrizePool(): Promise<PrizePoolConfig | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-  
-  try {
-    const weekKey = getCurrentWeekKey();
-    const configJson = await redis.get(KEYS.prizePoolConfig(weekKey));
-    
-    if (!configJson) {
-      // Return default config if none exists
-      const bounds = getWeekBounds(weekKey);
-      return {
-        weekKey,
-        prizeAmount: parseFloat(process.env.PRIZE_POOL_DEFAULT_AMOUNT || '1000'),
-        startDate: bounds.startDate,
-        endDate: bounds.endDate,
-        status: 'active',
-      };
-    }
-    
-    return typeof configJson === 'string' ? JSON.parse(configJson) as PrizePoolConfig : configJson as PrizePoolConfig;
-  } catch (error) {
-    console.error('Error fetching prize pool config:', error);
-    return null;
-  }
-}
-
-/**
- * Initializes weekly prize pool
- */
-export async function initializeWeeklyPrizePool(
-  prizeAmount: number = 1000,
-  sponsor?: SponsorInfo
-): Promise<boolean> {
-  const redis = getRedis();
-  if (!redis) return false;
-  
-  try {
-    const weekKey = getCurrentWeekKey();
-    const bounds = getWeekBounds(weekKey);
-    
-    const config: PrizePoolConfig = {
-      weekKey,
-      prizeAmount,
-      startDate: bounds.startDate,
-      endDate: bounds.endDate,
-      sponsor,
-      status: 'active',
-    };
-    
-    await redis.set(KEYS.prizePoolConfig(weekKey), JSON.stringify(config), { ex: 60 * 60 * 24 * 8 });
-    
-    if (sponsor) {
-      await redis.set(KEYS.prizePoolSponsor(weekKey), JSON.stringify(sponsor), { ex: 60 * 60 * 24 * 8 });
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error initializing prize pool:', error);
-    return false;
-  }
-}
-
-/**
- * Gets sponsor for current week
- */
-export async function getSponsor(): Promise<SponsorInfo | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-  
-  try {
-    const weekKey = getCurrentWeekKey();
-    const sponsorJson = await redis.get(KEYS.prizePoolSponsor(weekKey));
-    
-    if (!sponsorJson) return null;
-    
-    return typeof sponsorJson === 'string' ? JSON.parse(sponsorJson) as SponsorInfo : sponsorJson as SponsorInfo;
-  } catch (error) {
-    console.error('Error fetching sponsor:', error);
-    return null;
-  }
-}
-
-/**
- * Gets sponsor token info (for first token feature)
- */
-export async function getSponsorToken(): Promise<{
-  address: string;
-  symbol: string;
-  name: string;
-  logoUrl?: string;
-} | null> {
-  const sponsor = await getSponsor();
-  if (!sponsor) return null;
-  
-  return {
-    address: sponsor.tokenAddress,
-    symbol: sponsor.tokenSymbol,
-    name: sponsor.tokenName,
-    logoUrl: sponsor.logoUrl,
+    ...DEFAULT_PRIZEPOOL,
+    enabled: false, // Hardcoded to false for now
   };
 }
 
 /**
- * Sets sponsor for current week
+ * Calculates prize amount for a specific rank
+ * @param rank - Player rank (1-25)
+ * @param totalAmount - Total prizepool amount in USDC
+ * @returns Prize amount in USDC, or null if rank not eligible
  */
-export async function setSponsor(sponsor: SponsorInfo): Promise<boolean> {
-  const redis = getRedis();
-  if (!redis) return false;
+export function calculatePrizeAmount(rank: number, totalAmount: number): number | null {
+  const config = getPrizepoolConfig();
   
-  try {
-    const weekKey = getCurrentWeekKey();
-    await redis.set(KEYS.prizePoolSponsor(weekKey), JSON.stringify(sponsor), { ex: 60 * 60 * 24 * 8 });
-    
-    // Update prize pool config to include sponsor
-    const config = await getCurrentPrizePool();
-    if (config) {
-      config.sponsor = sponsor;
-      await redis.set(KEYS.prizePoolConfig(weekKey), JSON.stringify(config), { ex: 60 * 60 * 24 * 8 });
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error setting sponsor:', error);
-    return false;
+  if (!config.enabled || totalAmount <= 0) {
+    return null;
   }
+  
+  if (rank < 1 || rank > 25) {
+    return null;
+  }
+  
+  const distribution = config.distribution.find(d => d.rank === rank);
+  if (!distribution) {
+    return null;
+  }
+  
+  return totalAmount * distribution.percentage;
 }
 
 /**
- * Gets weekly scores (top N)
+ * Calculates all prize amounts for top 25
+ * @param totalAmount - Total prizepool amount in USDC
+ * @returns Array of prize amounts for ranks 1-25
  */
-export async function getWeeklyScores(limit: number = 50): Promise<WeeklyScore[]> {
-  const redis = getRedis();
-  if (!redis) return [];
+export function calculateAllPrizeAmounts(totalAmount: number): PrizeAmount[] {
+  const config = getPrizepoolConfig();
   
-  try {
-    const { getWeeklyCumulativeScores } = await import('../redis');
-    const scores = await getWeeklyCumulativeScores(limit);
-    
-    return scores.map(score => ({
-      userId: score.userId,
-      cumulativeScore: score.cumulativeScore,
-      bestStreak: score.bestStreak,
-      runCount: score.runCount,
-      lastUpdated: Date.now(), // Could be improved to track actual last updated
-    }));
-  } catch (error) {
-    console.error('Error fetching weekly scores:', error);
-    return [];
-  }
-}
-
-/**
- * Gets user's weekly score
- */
-export async function getUserWeeklyScore(userId: string): Promise<number> {
-  const redis = getRedis();
-  if (!redis) return 0;
-  
-  try {
-    const { getUserWeeklyScore: getScore } = await import('../redis');
-    return await getScore(userId);
-  } catch (error) {
-    console.error('Error fetching user weekly score:', error);
-    return 0;
-  }
-}
-
-/**
- * Calculates prize distribution for top N users
- */
-export function calculatePrizeDistribution(
-  scores: WeeklyScore[],
-  prizeAmount: number
-): Array<{ userId: string; prize: number; rank: number }> {
-  if (scores.length === 0 || prizeAmount <= 0) {
+  if (!config.enabled || totalAmount <= 0) {
     return [];
   }
   
-  // Filter to top 50 only
-  const top50 = scores.slice(0, 50);
-  
-  // Calculate total score of top 50
-  const totalScore = top50.reduce((sum, score) => sum + score.cumulativeScore, 0);
-  
-  if (totalScore === 0) {
-    return [];
-  }
-  
-  // Calculate proportional distribution
-  const distribution = top50.map((score, index) => {
-    const prize = (score.cumulativeScore / totalScore) * prizeAmount;
-    return {
-      userId: score.userId,
-      prize: Math.round(prize * 100) / 100, // Round to 2 decimal places
-      rank: index + 1,
-    };
-  });
-  
-  return distribution;
+  return config.distribution.map(({ rank, percentage }) => ({
+    rank,
+    amount: totalAmount * percentage,
+    percentage,
+  }));
 }
 
 /**
- * Tracks weekly score (wrapper around redis function)
+ * Checks if a rank is eligible for prizepool
+ * @param rank - Player rank
+ * @returns True if rank is in top 25
  */
-export async function trackWeeklyScore(userId: string, streak: number): Promise<number> {
-  const redis = getRedis();
-  if (!redis) return 0;
-  
-  try {
-    const { trackWeeklyScore: trackScore } = await import('../redis');
-    return await trackScore(userId, streak);
-  } catch (error) {
-    console.error('Error tracking weekly score:', error);
-    return 0;
-  }
+export function isEligibleForPrizepool(rank: number): boolean {
+  return rank >= 1 && rank <= 25;
 }
 
-
-
+/**
+ * Gets prizepool summary for display
+ * @param totalAmount - Total prizepool amount in USDC
+ * @returns Summary object with total amount and eligible count
+ */
+export function getPrizepoolSummary(totalAmount: number): {
+  enabled: boolean;
+  totalAmount: number;
+  eligibleRanks: number;
+  topPrize: number | null;
+} {
+  const config = getPrizepoolConfig();
+  
+  return {
+    enabled: config.enabled && totalAmount > 0,
+    totalAmount,
+    eligibleRanks: 25,
+    topPrize: config.enabled && totalAmount > 0 
+      ? calculatePrizeAmount(1, totalAmount) 
+      : null,
+  };
+}
 

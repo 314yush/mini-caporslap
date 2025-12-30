@@ -45,3 +45,8 @@ src/lib/mock-leaderboard.ts
 src/app/api/debug/
 # dev mode (local testing only)
 src/hooks/useAuthDev.ts
+# test pages (local testing only)
+src/app/test-mystery-box/
+src/app/test-mystery-box-ui/
+src/app/api/mystery-box/test-prices/
+test-mystery-box.js
