@@ -13,6 +13,7 @@ export function getFeatureFlags(): FeatureFlags {
   return {
     reprieve: process.env.FEATURE_REPRIEVE === 'true',
     walletConnect: process.env.FEATURE_WALLET_CONNECT === 'true',
+    mysteryBox: process.env.FEATURE_MYSTERY_BOX === 'true',
   };
 }
 
@@ -32,10 +33,10 @@ export function isFeatureEnabled(feature: keyof FeatureFlags): boolean {
  */
 export function getClientFeatureFlags(): FeatureFlags {
   // In client components, we need to use NEXT_PUBLIC_ prefix
-  // For now, default to disabled until we set up proper client config
   return {
-    reprieve: false,
-    walletConnect: false,
+    reprieve: process.env.NEXT_PUBLIC_FEATURE_REPRIEVE === 'true',
+    walletConnect: process.env.NEXT_PUBLIC_FEATURE_WALLET_CONNECT === 'true',
+    mysteryBox: process.env.NEXT_PUBLIC_FEATURE_MYSTERY_BOX === 'true',
   };
 }
 

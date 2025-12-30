@@ -8,6 +8,8 @@ import { generateShareData, generateShareText, shareToClipboard } from '@/lib/so
 import { miniAppComposeCast } from '@/lib/farcaster/sdk';
 import { canOfferReprieve, getReprieveState, getReprieveCopy, isReprieveFree } from '@/lib/game-core/reprieve';
 import { useReprievePayment, PaymentStatus } from '@/hooks/useReprievePayment';
+import { useMysteryBox } from '@/hooks/useMysteryBox';
+import { MysteryBox } from '@/components/mystery-box';
 import { trackSocialShare } from '@/lib/analytics/engagement';
 import { trackShareInSession } from '@/lib/analytics/session';
 import { trackReprieveDecision, trackDropOff } from '@/lib/analytics/engagement';
@@ -43,6 +45,31 @@ export function LossScreen({
   const [reprieveState, setReprieveState] = useState<Awaited<ReturnType<typeof getReprieveState>> | null>(null);
   const lossScreenStartTime = useState(() => Date.now())[0];
   const reprieveDecisionStartTime = useState(() => Date.now())[0];
+  
+  // Mystery box hook
+  const mysteryBoxHook = useMysteryBox();
+  const [showMysteryBox, setShowMysteryBox] = useState(false);
+  
+  // Check eligibility when loss screen shows
+  useEffect(() => {
+    if (run.userId && run.streak >= 5) {
+      mysteryBoxHook.checkEligibility(run.userId, run.streak);
+    }
+  }, [run.userId, run.streak, mysteryBoxHook]);
+  
+  const handleOpenMysteryBox = async () => {
+    if (!run.userId) return;
+    const success = await mysteryBoxHook.claimMysteryBox(run.userId, run.streak, run.runId);
+    if (success) {
+      setShowMysteryBox(true);
+    }
+  };
+  
+  const handleMysteryBoxClaimSuccess = () => {
+    setShowMysteryBox(false);
+    mysteryBoxHook.reset();
+    // Optionally refresh or show success message
+  };
   
   // Fetch reprieve state
   useEffect(() => {
@@ -330,6 +357,35 @@ export function LossScreen({
               </div>
             )}
 
+            {/* Mystery Box button */}
+            {mysteryBoxHook.state.eligible && !mysteryBoxHook.state.box && (
+              <button
+                onClick={handleOpenMysteryBox}
+                disabled={isPaying || mysteryBoxHook.state.claiming || mysteryBoxHook.state.checking}
+                className="
+                  w-full py-4 px-6 rounded-2xl
+                  bg-gradient-to-br from-amber-500 to-orange-500
+                  text-white font-bold text-lg
+                  shadow-lg shadow-amber-500/30
+                  transform transition-all
+                  hover:scale-[1.02] active:scale-[0.98]
+                  disabled:opacity-50
+                  flex items-center justify-center gap-2
+                "
+              >
+                {mysteryBoxHook.state.claiming || mysteryBoxHook.state.checking ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    🎁 Claim Mystery Box
+                  </>
+                )}
+              </button>
+            )}
+
             {/* Share button - uses composeCast in Mini App */}
             <button
               onClick={handleShare}
@@ -371,6 +427,15 @@ export function LossScreen({
           </div>
         )}
       </div>
+
+      {/* Mystery Box Modal */}
+      {showMysteryBox && mysteryBoxHook.state.box && (
+        <MysteryBox
+          box={mysteryBoxHook.state.box}
+          onClaimSuccess={handleMysteryBoxClaimSuccess}
+          onClose={() => setShowMysteryBox(false)}
+        />
+      )}
     </div>
   );
 }

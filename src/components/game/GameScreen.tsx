@@ -13,6 +13,7 @@ import { TokenInfoTooltip } from './TokenInfoTooltip';
 import { GameTimer } from './GameTimer';
 import { LiveOvertakeQueue } from './LiveOvertakeToast';
 import { UserMenu } from '@/components/auth/UserMenu';
+import { MysteryBoxCounter } from '@/components/mystery-box';
 import { 
   initSessionTracking, 
   trackGameStartInSession,
@@ -333,13 +334,17 @@ function SplitScreenGame({
       </div>
 
       {/* Top bar with streak and user menu */}
-      <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
-        {/* Left side: Streak counter */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+      <div className="absolute top-4 left-4 right-4 z-30 flex items-start justify-between pointer-events-none">
+        {/* Left side: Streak + Mystery Box Counter (stacked) */}
+        <div className="flex flex-col items-start gap-2 pointer-events-auto">
+          {/* Streak counter */}
           <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5">
             <span className="text-amber-400 text-lg">🔥</span>
             <span className="text-white font-bold text-lg tabular-nums">{streak}</span>
           </div>
+
+          {/* Mystery Box Counter */}
+          <MysteryBoxCounter />
         </div>
 
         {/* Right side: User menu + Leaderboard */}
