@@ -25,8 +25,14 @@ export function MysteryBox({
   const [mounted, setMounted] = useState(false);
 
   // Ensure component only renders on client to avoid hydration issues
+  // Use a ref to track if we've already set mounted to avoid setState in effect
   useEffect(() => {
-    setMounted(true);
+    if (typeof window !== 'undefined') {
+      // Use a microtask to defer setState outside of effect body
+      Promise.resolve().then(() => {
+        setMounted(true);
+      });
+    }
   }, []);
 
   // Trigger confetti when revealed

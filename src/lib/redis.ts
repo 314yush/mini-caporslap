@@ -318,7 +318,6 @@ export async function trackWeeklyScore(userId: string, streak: number): Promise<
   }
   
   try {
-    const weekKey = getWeekKey();
     const statsKey = KEYS.userWeeklyStats(userId);
     const scoresKey = KEYS.weeklyCumulativeScores();
     
@@ -467,8 +466,6 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
   if (!client || results.length === 0) return [];
   
   const entries: LeaderboardEntry[] = [];
-  const userIdsToResolve: string[] = [];
-  const userIdMap = new Map<string, { member: { userId: string; usedReprieve?: boolean; timestamp?: number }; score: number; index: number }>();
   
   // First pass: collect all user IDs and check cache
   for (let i = 0; i < results.length; i += 2) {
@@ -698,7 +695,7 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
             };
             // Cache the resolved identity
             await client.set(KEYS.userProfile(userId), JSON.stringify(identity), { ex: 86400 * 7 });
-          } catch (error) {
+          } catch {
             // Fallback: for FIDs, show as "FID X", for addresses, truncate
             if (isFID) {
               user = { userId, userType: 'farcaster', displayName: `FID ${userId}` };
@@ -798,7 +795,7 @@ async function formatLeaderboardResults(results: string[]): Promise<LeaderboardE
         usedReprieve: member.usedReprieve || false,
         timestamp: member.timestamp || Date.now(),
       });
-      } catch (error) {
+      } catch {
         // Skip malformed entries
         continue;
       }

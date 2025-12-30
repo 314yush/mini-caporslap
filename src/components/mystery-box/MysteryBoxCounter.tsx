@@ -36,8 +36,13 @@ export function MysteryBoxCounter() {
   // Fetch on mount and every 30 seconds
   useEffect(() => {
     const flags = getClientFeatureFlags();
-    if (!flags.mysteryBox) {
-      setIsLoading(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mysteryBoxEnabled = 'mysteryBox' in flags ? (flags as Record<string, boolean>).mysteryBox : false;
+    if (!mysteryBoxEnabled) {
+      // Defer setState to avoid synchronous setState in effect
+      Promise.resolve().then(() => {
+        setIsLoading(false);
+      });
       return;
     }
 
@@ -52,7 +57,9 @@ export function MysteryBoxCounter() {
 
   // Don't render if feature is disabled
   const flags = getClientFeatureFlags();
-  if (!flags.mysteryBox) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mysteryBoxEnabled = 'mysteryBox' in flags ? (flags as Record<string, boolean>).mysteryBox : false;
+  if (!mysteryBoxEnabled) {
     return null;
   }
 

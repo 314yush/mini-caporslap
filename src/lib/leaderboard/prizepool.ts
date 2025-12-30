@@ -4,11 +4,28 @@
  */
 
 import { getFeatureFlags } from '@/lib/feature-flags';
+import { getCurrentWeekStart, getNextSundayMidnightUTC } from './week-timer';
 
 export interface PrizepoolConfig {
   enabled: boolean;
   totalAmount: number; // USDC amount
   distribution: Array<{ rank: number; percentage: number }>; // Top 25 distribution
+}
+
+// Prize pool config for weekly cycles (different from PrizepoolConfig above)
+export interface PrizePoolConfig {
+  weekKey: string;
+  prizeAmount: number;
+  sponsor?: SponsorInfo;
+  status: 'active' | 'completed';
+  startDate: number;
+  endDate: number;
+}
+
+export interface SponsorInfo {
+  address: string;
+  symbol: string;
+  name: string;
 }
 
 export interface PrizeAmount {
@@ -145,5 +162,121 @@ export function getPrizepoolSummary(totalAmount: number): {
       ? calculatePrizeAmount(1, totalAmount) 
       : null,
   };
+}
+
+/**
+ * Gets the current week key (YYYY-WW format)
+ * Weeks start on Sunday at midnight UTC
+ */
+export function getCurrentWeekKey(): string {
+  const now = new Date();
+  const utcDate = new Date(now.toISOString());
+  
+  // Get the current day of week (0 = Sunday, 6 = Saturday)
+  const day = utcDate.getUTCDay();
+  
+  // Calculate days to subtract to get to the most recent Sunday
+  const daysToSunday = day === 0 ? 0 : day;
+  const sunday = new Date(utcDate);
+  sunday.setUTCDate(utcDate.getUTCDate() - daysToSunday);
+  sunday.setUTCHours(0, 0, 0, 0);
+  
+  // Calculate week number from start of year
+  const year = sunday.getUTCFullYear();
+  const startOfYear = new Date(Date.UTC(year, 0, 1));
+  
+  // Find the first Sunday of the year
+  const firstSundayDay = startOfYear.getUTCDay();
+  const daysToFirstSunday = firstSundayDay === 0 ? 0 : 7 - firstSundayDay;
+  const firstSunday = new Date(startOfYear);
+  firstSunday.setUTCDate(1 + daysToFirstSunday);
+  firstSunday.setUTCHours(0, 0, 0, 0);
+  
+  // Calculate weeks since first Sunday
+  const daysSinceFirstSunday = Math.floor((sunday.getTime() - firstSunday.getTime()) / (24 * 60 * 60 * 1000));
+  const week = Math.floor(daysSinceFirstSunday / 7) + 1;
+  
+  return `${year}-${week.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Gets week bounds (start and end dates)
+ */
+export function getWeekBounds(weekKey?: string): { start: Date; end: Date } {
+  const weekStart = getCurrentWeekStart();
+  const weekEnd = getNextSundayMidnightUTC();
+  
+  return {
+    start: weekStart,
+    end: weekEnd,
+  };
+}
+
+// Stub functions for incomplete features
+
+// Stub functions - these need to be implemented properly
+export async function getCurrentPrizePool(): Promise<PrizePoolConfig | null> {
+  return null; // Feature not implemented
+}
+
+export async function getWeeklyScores(limit: number = 50): Promise<Array<{ userId: string; score: number }>> {
+  return []; // Feature not implemented
+}
+
+export async function getUserWeeklyScore(userId: string): Promise<number> {
+  return 0; // Feature not implemented
+}
+
+export function calculatePrizeDistribution(
+  scores: Array<{ userId: string; score?: number; cumulativeScore?: number; bestStreak?: number; runCount?: number; lastUpdated?: number }>,
+  prizeAmount: number
+): Array<{ userId: string; prize: number; rank: number }> {
+  if (!scores || scores.length === 0 || prizeAmount <= 0) {
+    return [];
+  }
+  
+  // Sort by cumulativeScore (descending) or score (descending)
+  const sorted = [...scores].sort((a, b) => {
+    const scoreA = a.cumulativeScore ?? a.score ?? 0;
+    const scoreB = b.cumulativeScore ?? b.score ?? 0;
+    return scoreB - scoreA;
+  });
+  
+  // Calculate distribution using the default prizepool config
+  const config = getPrizepoolConfig();
+  if (!config.enabled) {
+    return [];
+  }
+  
+  const distribution: Array<{ userId: string; prize: number; rank: number }> = [];
+  
+  for (let i = 0; i < Math.min(sorted.length, 25); i++) {
+    const rank = i + 1;
+    const prize = calculatePrizeAmount(rank, prizeAmount);
+    if (prize !== null) {
+      distribution.push({
+        userId: sorted[i].userId,
+        prize,
+        rank,
+      });
+    }
+  }
+  
+  return distribution;
+}
+
+export async function getSponsor(): Promise<SponsorInfo | null> {
+  return null; // Feature not implemented
+}
+
+export async function setSponsor(sponsor: SponsorInfo): Promise<boolean> {
+  return false; // Feature not implemented
+}
+
+export async function initializeWeeklyPrizePool(
+  prizeAmount: number,
+  sponsor?: SponsorInfo
+): Promise<boolean> {
+  return false; // Feature not implemented
 }
 

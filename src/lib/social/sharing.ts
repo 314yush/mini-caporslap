@@ -299,6 +299,35 @@ export function generateLeaderboardShareText(
   return `I'm ranked #${rank} on CapOrSlap with ${score} score! 🏆`;
 }
 
+/**
+ * Shares mystery box reward
+ * @param rewards - Array of mystery box rewards with symbol and usdValue
+ * @param totalValue - Total value of all rewards
+ * @returns Whether share was initiated
+ */
+export async function shareMysteryBoxReward(
+  rewards: Array<{ symbol: string; usdValue: number }>,
+  totalValue: number
+): Promise<boolean> {
+  const rewardText = rewards.map(r => `${r.usdValue.toFixed(2)} ${r.symbol}`).join(', ');
+  const message = `Just claimed $${totalValue.toFixed(2)} in mystery box rewards on CapOrSlap! 🎁\n\n${rewardText}`;
+  
+  const environment = detectEnvironment();
+  
+  if (environment === 'miniapp') {
+    const shareData: ShareData = {
+      streak: 0,
+      runId: '',
+      userId: '',
+      message,
+      url: APP_URL,
+    };
+    return await shareToCast(shareData);
+  }
+  
+  return shareToClipboard(`${message}\n\n${APP_URL}`);
+}
+
 
 
 

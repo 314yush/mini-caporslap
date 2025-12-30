@@ -74,7 +74,16 @@ export async function getActiveSponsor(): Promise<{
 } | null> {
   try {
     const { getSponsor } = await import('@/lib/leaderboard/prizepool');
-    return await getSponsor();
+    const sponsor = await getSponsor();
+    // Convert SponsorInfo to expected format
+    if (!sponsor) return null;
+    return {
+      tokenAddress: sponsor.address,
+      tokenSymbol: sponsor.symbol,
+      tokenName: sponsor.name,
+      companyName: sponsor.name,
+      reprievePrice: 0, // Default reprieve price
+    };
   } catch (error) {
     console.error('Error fetching active sponsor:', error);
     return null;
