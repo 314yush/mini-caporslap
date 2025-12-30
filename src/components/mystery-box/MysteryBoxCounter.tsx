@@ -84,16 +84,26 @@ export function MysteryBoxCounter() {
         </span>
       </div>
       
-      {/* Tooltip on hover */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none z-50">
-        <div className="bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-zinc-700 whitespace-nowrap">
-          <p className="font-semibold mb-1">Mystery Boxes</p>
-          <p className="text-zinc-400">
+      {/* Tooltip on hover - positioned to avoid cutoff */}
+      <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block pointer-events-none z-[100] max-w-[280px] sm:max-w-[320px]">
+        <div className="bg-zinc-900 text-white text-xs rounded-lg px-4 py-3 shadow-2xl border border-zinc-700">
+          <p className="font-bold mb-2 text-amber-400">🎁 Mystery Boxes</p>
+          <p className="text-zinc-300 mb-2">
             {poolCount} {poolCount === 1 ? 'box' : 'boxes'} remaining today
           </p>
+          
+          <div className="border-t border-zinc-700 pt-2 mt-2 space-y-1.5">
+            <p className="font-semibold text-zinc-200 text-[11px] mb-1.5">How it works:</p>
+            <ul className="text-zinc-400 text-[11px] space-y-1 list-disc list-inside">
+              <li>Scratch to reveal crypto rewards</li>
+              <li>Available after losing with streak 5+</li>
+              <li>Max 2 boxes per day</li>
+              <li>Must play 3+ games to unlock</li>
+            </ul>
+          </div>
         </div>
-        {/* Arrow */}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-zinc-900" />
+        {/* Arrow pointing down */}
+        <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-zinc-900" />
       </div>
     </div>
   );
