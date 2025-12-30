@@ -41,35 +41,13 @@ export async function POST(request: NextRequest) {
     // Generate run ID and seed
     const runId = uuidv4();
     const seed = generateGameSeed();
-
-    // Check for active sponsor and get sponsor token
-    let sponsorToken: Token | null = null;
-    try {
-      const { getSponsorToken } = await import('@/lib/leaderboard/prizepool');
-      const sponsorInfo = await getSponsorToken();
-      
-      if (sponsorInfo) {
-        // Find sponsor token in token pool by address
-        sponsorToken = tokens.find(
-          t => t.address?.toLowerCase() === sponsorInfo.address.toLowerCase() ||
-               t.symbol.toUpperCase() === sponsorInfo.symbol.toUpperCase()
-        ) || null;
-        
-        if (!sponsorToken) {
-          console.warn(`[Game Start] Sponsor token ${sponsorInfo.symbol} not found in token pool`);
-        }
-      }
-    } catch (error) {
-      console.warn('[Game Start] Error checking for sponsor:', error);
-      // Continue with normal selection if sponsor check fails
-    }
     
-    // Select initial pair (with sponsor token if available)
+    // Select initial pair
     // For initial pair, prioritize famous tokens for easy gameplay
     let currentToken, nextToken;
     try {
       // Try famous token pair first (for easy initial gameplay)
-      const famousPair = selectFamousTokenPair(tokens, sponsorToken);
+      const famousPair = selectFamousTokenPair(tokens);
       if (famousPair) {
         [currentToken, nextToken] = famousPair;
       } else {
@@ -80,8 +58,7 @@ export async function POST(request: NextRequest) {
           nextToken = pair.nextToken;
         } else {
           // Final fallback to regular selection
-          const { selectInitialPairWithSponsor } = await import('@/lib/game-core/sequencing');
-          [currentToken, nextToken] = selectInitialPairWithSponsor(tokens, sponsorToken);
+          [currentToken, nextToken] = selectInitialPair(tokens);
         }
       }
     } catch {
